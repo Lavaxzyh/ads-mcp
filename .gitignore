@@ -1,0 +1,10 @@
+.venv/
+state/
+__pycache__/
+*.pyc
+*.ds
+*.s2p
+*.png
+sim_out*/
+*_wrk/
+scratch/
