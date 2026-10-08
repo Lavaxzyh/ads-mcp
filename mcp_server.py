@@ -34,6 +34,8 @@ unfamiliar parts.  Microstrip cells (MLIN, MSUB, MTEE, ...) live in
 automatically before netlisting."""
 
 mcp = FastMCP("ads-mcp", instructions=INSTRUCTIONS)
+# FastMCP does not expose the server version; report ours instead of the SDK's
+mcp._mcp_server.version = "0.1.0"
 engine = AdsEngine()
 state = SessionState(_HERE / "state" / "session_state.json")
 
