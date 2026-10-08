@@ -18,7 +18,7 @@
 
 ADS 2027 自带官方 MCP 服务器(`bin\ads-mcp.exe`):闭源、定位是**薄通用 REPL**——一个 `execute_python` 工具暴露整套 ADS Python API。能力很强,但要求代理已经会写 ADS Python,每一步都得自己编码。
 
-**ads-mcp 反其道而行**:把设计工作流本身做成 **21 个具名、带 schema 文档的工具**,并内置防呆护栏。从未见过 ADS Python API 的代理,用对话就能跑通"原理图 → 网表 → hpeesofsim → S 参数"全闭环。
+**ads-mcp 反其道而行**:把设计工作流本身做成 **23 个具名、带 schema 文档的工具**,并内置防呆护栏。从未见过 ADS Python API 的代理,用对话就能跑通"原理图 → 网表 → hpeesofsim → S 参数"全闭环。
 
 | | 官方 `ads-mcp.exe` | 本项目 |
 |---|---|---|
@@ -30,12 +30,12 @@ ADS 2027 自带官方 MCP 服务器(`bin\ads-mcp.exe`):闭源、定位是**薄�
 | 会话状态 | 内存态 | JSON 状态机落盘,重启可恢复 |
 | 脱离 GUI | 本地会话需拉许可证 | headless automation 模式,始终无界面 |
 
-两者都是 stdio MCP 服务器,可并列注册:本项目 21 个工具覆盖设计闭环,官方 `execute_python` 兜底其余操作。
+两者都是 stdio MCP 服务器,可并列注册:本项目 23 个工具覆盖设计闭环,官方 `execute_python` 兜底其余操作。
 
 ## 亮点
 
 - **headless 优先** —— 全程无需打开 ADS 界面;最后用 `ads_open_in_gui` 打开欣赏成果即可。
-- **21 个领域工具** —— 微带设计闭环每一步都是具名工具,schema 即文档,见下方工具面。
+- **23 个领域工具** —— 微带设计闭环每一步都是具名工具,schema 即文档,见下方工具面。
 - **护栏内置** —— 基板自动命名、字符串引用参数保护、`ads_browse_components` 提供权威元件/参数名表。
 - **异步仿真** —— `ads_run_simulation` 立即返回 task id,`ads_get_sim_status` 轮询;长仿真不再卡死工具调用。
 - **会话状态落盘** —— JSON 状态机(idle → building → simulating → analyzing),服务器重启可恢复、任务可追溯。
@@ -68,7 +68,7 @@ cd ads-mcp
 }
 ```
 
-重启客户端(Claude Desktop / ZCode / Cursor / …),21 个 `ads_*` 工具即出现。
+重启客户端(Claude Desktop / ZCode / Cursor / …),23 个 `ads_*` 工具即出现。
 
 不用代理也可以直接体验:
 
@@ -78,7 +78,7 @@ cd ads-mcp
 
 该脚本分 15 步旁白式搭完一个滤波器、仿真、导出,并在 ADS GUI 中打开结果。
 
-## 工具面(21 个)
+## 工具面(23 个)
 
 ### 环境与会话(5)
 
@@ -121,7 +121,7 @@ cd ads-mcp
 | `ads_plot_sparams` | 绘制 \|S\| dB–频率曲线(可选列)输出 PNG。 |
 | `ads_open_in_gui` | 在 ADS GUI 中打开当前工作区(脱离进程树,服务器重启不影响)。 |
 
-当前注册工具数:**21**。
+当前注册工具数:**23**。
 
 ## 示例工作流
 
@@ -170,7 +170,7 @@ ads_open_in_gui()                                       # 打开 GUI 欣赏
 
 MCP 层端到端验收(`tests/test_full_flow.py`,ADS 2027):
 
-- ✅ 21 个工具经 stdio 注册并可调用
+- ✅ 23 个工具经 stdio 注册并可调用
 - ✅ 对话式搭建:放置 13 个实例、网表核对、task id 提交/轮询仿真
 - ✅ SI-LPF 响应:通带 −0.08 dB,−3 dB 截止 **1.025 GHz**(设计目标 1 GHz),6 GHz 处阻带 −38 dB
 - ✅ Touchstone + PNG 导出、GUI 交接

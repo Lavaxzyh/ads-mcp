@@ -18,7 +18,7 @@ English · [简体中文](README.zh-CN.md)
 
 ADS 2027 ships an official MCP server (`bin\ads-mcp.exe`): closed-source, and built as a **thin generic REPL** — one `execute_python` tool over the full ADS Python API. Powerful, but the agent must already know the API and write code for every step.
 
-**ads-mcp** takes the opposite approach: the design workflow itself is encoded as **21 named, schema-documented tools** with guardrails, so an agent that has never seen the ADS Python API can run the full loop — schematic → netlist → `hpeesofsim` → S-parameters — conversationally.
+**ads-mcp** takes the opposite approach: the design workflow itself is encoded as **23 named, schema-documented tools** with guardrails, so an agent that has never seen the ADS Python API can run the full loop — schematic → netlist → `hpeesofsim` → S-parameters — conversationally.
 
 | | Official `ads-mcp.exe` | This project |
 |---|---|---|
@@ -30,12 +30,12 @@ ADS 2027 ships an official MCP server (`bin\ads-mcp.exe`): closed-source, and bu
 | Session state | in-memory | persisted JSON state machine |
 | Works without GUI | local session, license checkout | headless automation mode, always |
 
-Both are stdio MCP servers; register both side by side if you like — this project's 21 tools cover the design loop, the official `execute_python` covers everything else.
+Both are stdio MCP servers; register both side by side if you like — this project's 23 tools cover the design loop, the official `execute_python` covers everything else.
 
 ## Highlights
 
 - **Headless-first** — the ADS GUI never needs to open; open it only at the end to admire the result (`ads_open_in_gui`).
-- **21 domain tools** — every step of the microstrip design loop is a named tool with a documented schema; see the tool surface below.
+- **23 domain tools** — every step of the microstrip design loop is a named tool with a documented schema; see the tool surface below.
 - **Guardrails built in** — substrate auto-naming, string-reference-parameter protection, authoritative component/parameter tables via `ads_browse_components`.
 - **Async simulation** — `ads_run_simulation` returns a task id immediately; poll with `ads_get_sim_status`. No 10-minute tool calls, no killed solves.
 - **Persistent session state** — a JSON state machine (idle → building → simulating → analyzing) survives server restarts and records every task.
@@ -68,7 +68,7 @@ cd ads-mcp
 }
 ```
 
-Restart your client (Claude Desktop / ZCode / Cursor / …) — the 21 `ads_*` tools appear.
+Restart your client (Claude Desktop / ZCode / Cursor / …) — the 23 `ads_*` tools appear.
 
 Try it without an agent:
 
@@ -178,7 +178,7 @@ The full narrated version of exactly this build lives in [`demo/step_by_step.py`
 
 End-to-end acceptance (MCP-level, `tests/test_full_flow.py`) on ADS 2027:
 
-- ✅ 21 tools registered and callable over stdio
+- ✅ 23 tools registered and callable over stdio
 - ✅ conversational build: 13 instances placed, netlist verified, simulation submitted/polled via task id
 - ✅ SI-LPF response: passband −0.08 dB, −3 dB cutoff **1.025 GHz** (design target 1 GHz), stopband −38 dB @ 6 GHz
 - ✅ Touchstone + PNG exports, GUI hand-off
