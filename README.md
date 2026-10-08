@@ -1,5 +1,7 @@
 # ads-mcp
 
+![Clones](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones.json) ![Views](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/views.json) ![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/installs.json)
+
 **An open, headless-first MCP server for Keysight ADS** — build RF/microwave schematics, netlist, simulate, and read S-parameters without ever opening the GUI.
 
 English · [简体中文](README.zh-CN.md)

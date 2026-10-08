@@ -1,5 +1,7 @@
 # ads-mcp
 
+![Clones](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones.json) ![Views](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/views.json) ![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/installs.json)
+
 **开源的 headless 优先 Keysight ADS MCP 服务器** —— 不打开 ADS 图形界面,让 AI 代理完成射频微波电路的原理图搭建 → 网表 → 仿真 → S 参数读取全流程。
 
 [English](README.md) · 简体中文
