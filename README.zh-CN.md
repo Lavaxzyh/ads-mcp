@@ -10,7 +10,7 @@
 ![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)
 ![ADS](https://img.shields.io/badge/Keysight_ADS-2025U2+-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tools](https://img.shields.io/badge/工具数-21-4c1)
+![Tools](https://img.shields.io/badge/工具数-23-4c1)
 
 > 与 Keysight Technologies 无关联、未获其认可。需要你自有的正版 ADS 许可证——本仓库不含任何 Keysight 代码或二进制。
 

@@ -10,7 +10,7 @@ English · [简体中文](README.zh-CN.md)
 ![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)
 ![ADS](https://img.shields.io/badge/Keysight_ADS-2025U2+-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tools](https://img.shields.io/badge/Tools-21-4c1)
+![Tools](https://img.shields.io/badge/Tools-23-4c1)
 
 > Not affiliated with or endorsed by Keysight Technologies. Requires your own licensed ADS installation — this repo ships no Keysight code or binaries.
 
@@ -112,6 +112,14 @@ This narrates a complete filter build (15 steps), simulates, exports, and opens 
 | `ads_run_simulation` | Save → netlist → run `hpeesofsim` in a background thread; returns a `task_id` immediately. |
 | `ads_get_sim_status` | Poll a simulation task; on completion carries the dataset (`.ds`) path. |
 
+### Optimization (2)
+
+| Tool | What it does |
+|---|---|
+| `ads_add_goal` | Add an optimization goal: expression (e.g. `dB(S(1,2))`), keep-above (`min`) or keep-below (`max`) bound, evaluation band, weight. |
+| `ads_add_optim` | Place the optimization controller (gradient/hpVMO, random, quasinewton, …); auto-collects every variable that has an opt range and every goal. |
+`ads_add_var` gains optional `opt_min`/`opt_max` — variables with a range become optimization variables.
+
 ### Results & export (4)
 
 | Tool | What it does |
@@ -121,7 +129,7 @@ This narrates a complete filter build (15 steps), simulates, exports, and opens 
 | `ads_plot_sparams` | Plot \|S\| dB vs frequency (selectable columns) to a PNG. |
 | `ads_open_in_gui` | Open the current workspace in the ADS GUI (detached process, survives server restarts). |
 
-Current MCP registration: **21 tools**.
+Current MCP registration: **23 tools**.
 
 ## Example Workflow
 
@@ -178,7 +186,7 @@ End-to-end acceptance (MCP-level, `tests/test_full_flow.py`) on ADS 2027:
 ## Roadmap
 
 - [ ] Parameter sweeps & MeasEqn tools
-- [ ] Optimizer hooks (geometry → spec closed-loop tuning)
+- [x] Optimizer hooks (geometry → spec closed-loop tuning)
 - [ ] EM (Momentum) flow
 - [ ] Multi-session registry (attach/audit concurrent ADS processes)
 - [ ] API doc search tool (complements the official server's `search_docs`)

@@ -182,14 +182,47 @@ def ads_add_wire(points: list[list[float]], label: str = "") -> dict[str, Any]:
 
 
 @mcp.tool()
-def ads_add_var(name: str, value: str) -> dict[str, Any]:
+def ads_add_var(name: str, value: str, opt_min: str = "", opt_max: str = "") -> dict[str, Any]:
     """Define a schematic variable in the VAR block, e.g. ("W_hi", "0.3 mm").
 
     Component parameters can then reference the name (e.g. W="W_hi").
+    Optional opt_min/opt_max turn it into an optimization variable
+    (e.g. opt_min="0.5 mm", opt_max="1.4 mm").
     """
     try:
         state.transition("building")
-        return _ok(**engine.add_var(name, value))
+        return _ok(**engine.add_var(name, value, opt_min.strip() or None, opt_max.strip() or None))
+    except Exception as exc:  # noqa: BLE001
+        return _err(exc)
+
+
+@mcp.tool()
+def ads_add_goal(expr: str, sim_name: str, goal_type: str, bound: str,
+                 fmin: str, fmax: str, weight: float = 1.0) -> dict[str, Any]:
+    """Add an optimization goal (ads_simulation:Goal).
+
+    goal_type 'min' keeps `expr` at or above `bound` (e.g. passband S21);
+    'max' keeps it at or below `bound` (e.g. stopband rejection, return loss
+    limit). `expr` like "dB(S(1,2))", `sim_name` is the analysis controller
+    name (e.g. "SP1"), fmin/fmax bracket the evaluation band.
+    """
+    try:
+        state.transition("building")
+        return _ok(**engine.add_goal(expr, sim_name, goal_type, bound, fmin, fmax, weight))
+    except Exception as exc:  # noqa: BLE001
+        return _err(exc)
+
+
+@mcp.tool()
+def ads_add_optim(optim_type: str = "gradient", max_iters: int = 60) -> dict[str, Any]:
+    """Place the optimization controller (ads_simulation:Optim).
+
+    It automatically collects every variable that has an opt range and every
+    goal on the schematic. optim_type: gradient / random / quasinewton.
+    """
+    try:
+        state.transition("building")
+        return _ok(**engine.add_optim(optim_type, int(max_iters)))
     except Exception as exc:  # noqa: BLE001
         return _err(exc)
 

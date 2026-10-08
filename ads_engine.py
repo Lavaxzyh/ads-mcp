@@ -225,7 +225,8 @@ class AdsEngine:
                 wire.add_wire_label(label)
             return {"wire": True, "points": pts, "label": label}
 
-    def add_var(self, name: str, value: str) -> dict[str, Any]:
+    def add_var(self, name: str, value: str, opt_min: str | None = None,
+                opt_max: str | None = None) -> dict[str, Any]:
         with self._op():
             de = get_de()
             design = self._current_design()
@@ -237,8 +238,78 @@ class AdsEngine:
                     name="VAR1",
                     angle=0.0,
                 )
-            var_inst.vars[name] = str(value)
-            return {"var": name, "value": str(value), "block": var_inst.name}
+            stored = str(value)
+            if opt_min and opt_max:
+                stored = f"{value} opt{{{opt_min} to {opt_max}}}"
+            var_inst.vars[name] = stored
+            return {"var": name, "value": str(value),
+                    "opt": f"{opt_min}..{opt_max}" if opt_min and opt_max else None,
+                    "block": var_inst.name}
+
+    def add_goal(self, expr: str, sim_name: str, goal_type: str, bound: str,
+                 fmin: str, fmax: str, weight: float = 1.0) -> dict[str, Any]:
+        """Add an optimization goal.
+
+        goal_type 'min' means "keep Expr at or above bound" (netlist
+        GreaterThan/Min); 'max' means "keep Expr at or below bound" (Max).
+        fmin/fmax bracket the evaluation frequency range; values with units
+        ("0.9 GHz") are converted to plain Hz numbers because the de layer
+        renders repeated-param strings unquoted (spaces break the netlist).
+        """
+
+        def to_hz(v: str) -> str:
+            s = str(v).strip()
+            try:
+                hz = float(s)
+            except ValueError:
+                m = re.match(r"^([0-9.eE+-]+)\s*(GHz|MHz|kHz|Hz)?$", s, re.IGNORECASE)
+                if not m:
+                    raise ValueError(f"cannot parse frequency {v!r}; use e.g. '0.9 GHz' or '9e8'")
+                mult = {"ghz": 1e9, "mhz": 1e6, "khz": 1e3, "hz": 1.0}
+                hz = float(m.group(1)) * mult[m.group(2).lower()]
+            # repeated params only accept strings, and strings with spaces
+            # render unquoted (netlist syntax error) -> plain Hz, no spaces
+            return f"{hz:.12g}"
+
+        with self._op():
+            de = get_de()
+            design = self._current_design()
+            existing = [i.name for i in design.instances if i.name.startswith("GOAL")]
+            name = f"GOAL{len(existing) + 1}"
+            inst = design.add_instance(
+                de.LCVName("ads_simulation", "Goal", "symbol"),
+                (0.5, -4.5 - 1.0 * len(existing)),
+                name=name,
+                angle=0.0,
+            )
+            inst.parameters["Expr"].value = str(expr)
+            inst.parameters["SimInstanceName"].value = str(sim_name)
+            inst.parameters["Min" if goal_type == "min" else "Max"].value = str(bound)
+            inst.parameters["Weight"].value = str(weight)
+            # repeated params take LISTS; strings with spaces render unquoted
+            # and break the netlist, so frequencies become plain Hz numbers
+            inst.parameters["RangeVar"].value = ["freq"]
+            inst.parameters["RangeMin"].value = [to_hz(fmin)]
+            inst.parameters["RangeMax"].value = [to_hz(fmax)]
+            return {"goal": name, "expr": str(expr), "type": goal_type,
+                    "bound": str(bound), "range": [str(fmin), str(fmax)], "weight": weight}
+
+    def add_optim(self, optim_type: str = "gradient", max_iters: int = 60) -> dict[str, Any]:
+        """Place the optimization controller (auto-collects all opt-vars and goals)."""
+        with self._op():
+            de = get_de()
+            design = self._current_design()
+            if design.find_instance("OPT1") is None:
+                design.add_instance(
+                    de.LCVName("ads_simulation", "Optim", "symbol"),
+                    (2.5, -4.5),
+                    name="OPT1",
+                    angle=0.0,
+                )
+            opt = design.find_instance("OPT1")
+            opt.parameters["OptimType"].value = str(optim_type)
+            opt.parameters["MaxIters"].value = str(max_iters)
+            return {"optim": "OPT1", "type": str(optim_type), "max_iters": max_iters}
 
     def add_term(self, name: str, x: float, y: float, z: str = "50 Ohm") -> dict[str, Any]:
         with self._op():
