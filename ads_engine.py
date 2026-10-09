@@ -181,6 +181,7 @@ class AdsEngine:
         instance_name: str | None = None,
         angle: float = 0.0,
         params: dict[str, str] | None = None,
+        show_annotations: bool = True,
     ) -> dict[str, Any]:
         with self._op():
             de = get_de()
@@ -192,6 +193,7 @@ class AdsEngine:
                 (float(x), float(y)),
                 name=instance_name,
                 angle=float(angle),
+                ads_annot=show_annotations,
             )
             applied: dict[str, str] = {}
             rejected: dict[str, str] = {}
@@ -311,6 +313,222 @@ class AdsEngine:
             opt.parameters["MaxIters"].value = str(max_iters)
             return {"optim": "OPT1", "type": str(optim_type), "max_iters": max_iters}
 
+    def audit_schematic(self, lib: str | None = None, cell: str | None = None) -> dict[str, Any]:
+        """KiCad-style schematic overlap audit (eeschema autoplace_fields 的思路):
+
+        对原理图每个实例取三种包围盒——本体 (body)、纯文字 (annotation)、
+        本体+文字 (full)——两两做内积重叠检测,按严重度分级:
+          body-body   元件本体互相重叠(最严重)
+          body-text   某元件的文字压到另一元件本体
+          text-text   文字互相重叠(较轻,常为标签挤压)
+        返回全部碰撞对及重叠矩形,布局修复以清零 body 级为目标。
+        若给 lib/cell 则只读打开磁盘上已保存的设计审计;否则审计当前内存设计。
+        """
+        with self._op():
+            de = get_de()
+            if lib and cell:
+                design = de.db_uu.open_design(f"{lib}:{cell}:schematic")  # READ_ONLY
+            else:
+                design = self._current_design()
+            EPS = 1e-9
+
+            def rect(b):
+                ll, ur = b.lower_left, b.upper_right
+                return (ll.x, ll.y, ur.x, ur.y)
+
+            # 分级阈值(KiCad 严重度思路):不同碰撞类型不同灵敏度,
+            # 避免全局一刀切——本体重叠要显著,文字擦碰即算,深压才算
+            SEV_EPS = {"body-body": 0.02, "body-text": 0.005, "text-body": 0.005,
+                       "text-text": 0.01, "text-wire": 0.005, "body-wire": 0.05}
+
+            def inter(a, b, eps=EPS):
+                x0, y0 = max(a[0], b[0]), max(a[1], b[1])
+                x1, y1 = min(a[2], b[2]), min(a[3], b[3])
+                if x1 - x0 > eps and y1 - y0 > eps:
+                    return (round(x0, 3), round(y0, 3), round(x1, 3), round(y1, 3))
+                return None
+
+            # 导线(de API:design.shapes -> Line,带 bbox)
+            wires = []
+            try:
+                for sh in design.shapes:
+                    bb = sh.bbox
+                    if bb is not None:
+                        wires.append((bb.lower_left.x, bb.lower_left.y,
+                                      bb.upper_right.x, bb.upper_right.y))
+            except Exception:
+                pass
+            items = []
+            for inst in design.instances:
+                try:
+                    body = rect(inst.bbox)
+                    ann = rect(inst.bbox_annotation_only)
+                except Exception:
+                    continue
+                pins = []
+                try:
+                    for ip in inst.inst_pins:
+                        sp = ip.snap_point
+                        pins.append((sp.x, sp.y))
+                except Exception:
+                    pass
+                items.append({"name": inst.name, "cell": str(getattr(inst, "cell_name", "")),
+                              "body": body, "text": ann, "pins": pins})
+
+            # 悬空线端点(ERC 式):端点不触任何引脚、不触其他线段
+            dangling = []
+            all_pins = [p for it in items for p in it["pins"]]
+            def _near_pt(a, b, tol=0.02):
+                return abs(a[0] - b[0]) <= tol and abs(a[1] - b[1]) <= tol
+            def _pt_seg_dist(p, s):
+                x0, y0, x1, y1 = s
+                dx, dy = x1 - x0, y1 - y0
+                L2 = dx * dx + dy * dy
+                if L2 == 0:
+                    return ((p[0] - x0) ** 2 + (p[1] - y0) ** 2) ** 0.5
+                tt = max(0, min(1, ((p[0] - x0) * dx + (p[1] - y0) * dy) / L2))
+                return ((p[0] - x0 - tt * dx) ** 2 + (p[1] - y0 - tt * dy) ** 2) ** 0.5
+            for si, s in enumerate(wires):
+                for ep in ((s[0], s[1]), (s[2], s[3])):
+                    if any(_near_pt(ep, p) for p in all_pins):
+                        continue
+                    if any(_pt_seg_dist(ep, o) <= 0.02
+                           for oj, o in enumerate(wires) if oj != si):
+                        continue
+                    dangling.append((round(ep[0], 2), round(ep[1], 2)))
+            collisions = []
+            for i in range(len(items)):
+                for j in range(i + 1, len(items)):
+                    A, B = items[i], items[j]
+                    sev = []
+                    pin_connected = any(
+                        abs(pa[0] - pb[0]) <= 0.02 and abs(pa[1] - pb[1]) <= 0.02
+                        for pa in A["pins"] for pb in B["pins"])
+                    for tag, box in (("body-body", (A["body"], B["body"])),
+                                     ("body-text", (A["body"], B["text"])),
+                                     ("text-body", (A["text"], B["body"])),
+                                     ("text-text", (A["text"], B["text"]))):
+                        ov = inter(*box, SEV_EPS.get(tag, EPS))
+                        if ov:
+                            if tag == "body-body" and pin_connected:
+                                continue  # 引脚相接的嵌套(GND 偎在电容底)是 ADS 原生画法
+                            sev.append({"kind": tag, "rect": ov})
+                    for tag, box in (("text-wire", A["text"]), ("body-wire", A["body"])):
+                        for w in wires:
+                            ov = inter(box, w, SEV_EPS.get(tag, EPS))
+                            if ov:
+                                sev.append({"kind": tag, "rect": ov})
+                    if sev:
+                        collisions.append({"a": A["name"], "b": B["name"], "collisions": sev})
+            for dp in dangling:
+                collisions.append({"a": f"wire@{dp}", "b": "(悬空)",
+                                   "collisions": [{"kind": "dangling-wire",
+                                                   "rect": [dp[0], dp[1], dp[0], dp[1]]}]})
+            return {"instances": len(items), "collisions": collisions,
+                    "collision_count": len(collisions), "dangling_wires": dangling}
+
+    def autolabel(self, max_pass: int = 4, step: float = 0.75) -> dict[str, Any]:
+        """KiCad eeschema autoplace_fields 的移植:文字级碰撞自动避让。
+
+        每一轮先审计,再对每个 text 级碰撞把"后放置实例"的标注按四个候选
+        方位(右/左/下/上,距离 step)试移——取第一个与对方 body/text 都
+        不相交的方位(对应 KiCad 的 chooseSideForFields 严重度过滤)。
+        body-body 碰撞不在此处理(属于布局间距问题),只报告。
+        """
+        with self._op():
+            de = get_de()
+            design = self._current_design()
+            EPS = 1e-9
+
+            def rect(b):
+                ll, ur = b.lower_left, b.upper_right
+                return (ll.x, ll.y, ur.x, ur.y)
+
+            def inter(a, b):
+                x0, y0 = max(a[0], b[0]), max(a[1], b[1])
+                x1, y1 = min(a[2], b[2]), min(a[3], b[3])
+                return (x1 - x0) > EPS and (y1 - y0) > EPS
+
+            def snapshot():
+                items = []
+                for inst in design.instances:
+                    try:
+                        items.append({"name": inst.name,
+                                      "body": rect(inst.bbox),
+                                      "text": rect(inst.bbox_annotation_only)})
+                    except Exception:
+                        continue
+                return items
+
+            moved = []
+            passes = []
+            for _ in range(max_pass):
+                items = snapshot()
+                by_name = {i["name"]: i for i in items}
+                collisions = []
+                for i in range(len(items)):
+                    for j in range(i + 1, len(items)):
+                        A, B = items[i], items[j]
+                        kinds = []
+                        if inter(A["body"], B["body"]):
+                            kinds.append("body-body")
+                        if inter(A["body"], B["text"]):
+                            kinds.append("body-text")
+                        if inter(A["text"], B["body"]):
+                            kinds.append("text-body")
+                        if inter(A["text"], B["text"]):
+                            kinds.append("text-text")
+                        if kinds:
+                            collisions.append({"a": A["name"], "b": B["name"],
+                                               "kinds": kinds})
+                text_collisions = [c for c in collisions
+                                   if any(k != "body-body" for k in c["kinds"])]
+                passes.append({"remaining": len(collisions),
+                               "text": len(text_collisions),
+                               "body": sum(1 for c in collisions
+                                           if "body-body" in c["kinds"])})
+                if not text_collisions:
+                    break
+                # fix the first text collision: move b's annotation away from a
+                c0 = text_collisions[0]
+                inst = design.find_instance(c0["b"])
+                if inst is None:
+                    break
+                A = by_name[c0["a"]]
+                B = by_name[c0["b"]]
+                others = [i for i in items if i["name"] not in (c0["a"], c0["b"])]
+                acx = (A["body"][0] + A["body"][2]) / 2
+                acy = (A["body"][1] + A["body"][3]) / 2
+                bcx = (B["text"][0] + B["text"][2]) / 2
+                bcy = (B["text"][1] + B["text"][3]) / 2
+                # 候选方位:远离 a 的方向优先(右/左/上/下)
+                sx = 1.0 if bcx >= acx else -1.0
+                sy = 1.0 if bcy >= acy else -1.0
+                candidates = [(sx * step, 0.0), (-sx * step, 0.0),
+                              (0.0, sy * step), (0.0, -sy * step),
+                              (sx * step, sy * step)]
+                chosen = None
+                for off in candidates:
+                    trial = (B["text"][0] + off[0], B["text"][1] + off[1],
+                             B["text"][2] + off[0], B["text"][3] + off[1])
+                    if not inter(trial, A["body"]) and not inter(trial, A["text"]):
+                        if not any(inter(trial, o["body"]) or inter(trial, o["text"])
+                                   for o in others):
+                            chosen = off
+                            break
+                if chosen is None:
+                    chosen = (sx * step, sy * step)  # fallback: move farther away
+                try:
+                    inst.move_annotation(chosen)
+                    moved.append({"inst": c0["b"], "offset": list(chosen),
+                                  "vs": c0["a"]})
+                except Exception:
+                    break
+            final = self.audit_schematic()
+            return {"moved": moved, "passes": passes,
+                    "remaining_collisions": final["collisions"],
+                    "collision_count": final["collision_count"]}
+
     def add_term(self, name: str, x: float, y: float, z: str = "50 Ohm") -> dict[str, Any]:
         with self._op():
             de = get_de()
@@ -327,7 +545,6 @@ class AdsEngine:
                 de.LCVName("ads_rflib", "GROUND", "symbol"),
                 (float(x), float(y) - 1.0),
                 name=f"GND_{name}",
-                angle=-90.0,
             )
             return {"term": name, "at": [x, y], "z": z}
 

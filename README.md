@@ -8,9 +8,9 @@ English · [简体中文](README.zh-CN.md)
 
 ![Python](https://img.shields.io/badge/Python-3.14_(ADS_bundled)-3776AB?logo=python&logoColor=white)
 ![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)
-![ADS](https://img.shields.io/badge/Keysight_ADS-2025U2+-red)
+![ADS](https://img.shields.io/badge/Tested_on_Keysight_ADS_2027-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tools](https://img.shields.io/badge/Tools-23-4c1)
+![Tools](https://img.shields.io/badge/Tools-25-4c1)
 
 > Not affiliated with or endorsed by Keysight Technologies. Requires your own licensed ADS installation — this repo ships no Keysight code or binaries.
 
@@ -18,7 +18,7 @@ English · [简体中文](README.zh-CN.md)
 
 ADS 2027 ships an official MCP server (`bin\ads-mcp.exe`): closed-source, and built as a **thin generic REPL** — one `execute_python` tool over the full ADS Python API. Powerful, but the agent must already know the API and write code for every step.
 
-**ads-mcp** takes the opposite approach: the design workflow itself is encoded as **23 named, schema-documented tools** with guardrails, so an agent that has never seen the ADS Python API can run the full loop — schematic → netlist → `hpeesofsim` → S-parameters — conversationally.
+**ads-mcp** takes the opposite approach: the design workflow itself is encoded as **25 named, schema-documented tools** with guardrails, so an agent that has never seen the ADS Python API can run the full loop — schematic → netlist → `hpeesofsim` → S-parameters — conversationally.
 
 | | Official `ads-mcp.exe` | This project |
 |---|---|---|
@@ -30,20 +30,22 @@ ADS 2027 ships an official MCP server (`bin\ads-mcp.exe`): closed-source, and bu
 | Session state | in-memory | persisted JSON state machine |
 | Works without GUI | local session, license checkout | headless automation mode, always |
 
-Both are stdio MCP servers; register both side by side if you like — this project's 23 tools cover the design loop, the official `execute_python` covers everything else.
+Both are stdio MCP servers; register both side by side if you like — this project's 25 tools cover the design loop, the official `execute_python` covers everything else.
 
 ## Highlights
 
 - **Headless-first** — the ADS GUI never needs to open; open it only at the end to admire the result (`ads_open_in_gui`).
-- **23 domain tools** — every step of the microstrip design loop is a named tool with a documented schema; see the tool surface below.
+- **25 domain tools** — every step of the microstrip design loop is a named tool with a documented schema; see the tool surface below.
 - **Guardrails built in** — substrate auto-naming, string-reference-parameter protection, authoritative component/parameter tables via `ads_browse_components`.
 - **Async simulation** — `ads_run_simulation` returns a task id immediately; poll with `ads_get_sim_status`. No 10-minute tool calls, no killed solves.
 - **Persistent session state** — a JSON state machine (idle → building → simulating → analyzing) survives server restarts and records every task.
 - **Real exports** — Touchstone `.s2p`, matplotlib PNG plots, dataset → pandas.
+- **Topology library** — Butterworth/Chebyshev LC ladders (LPF/HPF/BPF/BSF) synthesized from g-parameters and built headlessly, every cell verified against theory.
+- **Layout audit** — KiCad-style overlap audit (`ads_audit_schematic`) plus annotation auto-placement (`ads_autolabel`) keep delivered schematics clean: zero body collisions, no dangling wire ends, no text-on-symbol grazes.
 
 ## Quick Start
 
-Prerequisites: **Keysight ADS 2025 Update 2 or later** (developed against ADS 2027 / v6.5.0) with a working license. The native DE engine is cp314-only — the ADS-bundled Python 3.14 is required.
+Prerequisites: Windows with a licensed Keysight ADS installation — verified end-to-end on ADS 2027 (v6.5.0); uses the `keysight.ads.de` Python API that Keysight has provided since ADS 2025U2, so earlier versions are untested. The native DE engine is cp314-only — the ADS-bundled Python 3.14 is required.
 
 ```bat
 git clone https://github.com/<you>/ads-mcp.git
@@ -68,7 +70,7 @@ cd ads-mcp
 }
 ```
 
-Restart your client (Claude Desktop / ZCode / Cursor / …) — the 23 `ads_*` tools appear.
+Restart your client (Claude Desktop / ZCode / Cursor / …) — the 25 `ads_*` tools appear.
 
 Try it without an agent:
 
@@ -120,6 +122,15 @@ This narrates a complete filter build (15 steps), simulates, exports, and opens 
 | `ads_add_optim` | Place the optimization controller (gradient/hpVMO, random, quasinewton, …); auto-collects every variable that has an opt range and every goal. |
 `ads_add_var` gains optional `opt_min`/`opt_max` — variables with a range become optimization variables.
 
+
+
+### Layout audit (2)
+
+| Tool | What it does |
+|---|---|
+| `ads_audit_schematic` | KiCad-style overlap audit of a saved or current schematic: pairwise instance bounding boxes (body vs annotation text) plus wire segments, graded by severity (body-body / body-text / text-text / text-wire / body-wire) with connectivity-aware exemptions and dangling-wire-endpoint (ERC-style) detection. |
+| `ads_autolabel` | Auto-places instance annotations to clear text-level collisions: for each clash, tries candidate sides (right/left/up/down, least-displacement first) and moves only the annotation — never the component. |
+
 ### Results & export (4)
 
 | Tool | What it does |
@@ -129,7 +140,7 @@ This narrates a complete filter build (15 steps), simulates, exports, and opens 
 | `ads_plot_sparams` | Plot \|S\| dB vs frequency (selectable columns) to a PNG. |
 | `ads_open_in_gui` | Open the current workspace in the ADS GUI (detached process, survives server restarts). |
 
-Current MCP registration: **23 tools**.
+Current MCP registration: **25 tools**.
 
 ## Example Workflow
 
@@ -170,7 +181,7 @@ The full narrated version of exactly this build lives in [`demo/step_by_step.py`
 
 ## Requirements
 
-- Windows, Keysight ADS 2025 Update 2+ installed and licensed (tested on ADS 2027 / v6.5.0)
+- Windows with a licensed Keysight ADS installation — verified end-to-end on ADS 2027 (v6.5.0); uses the `keysight.ads.de` Python API provided by Keysight since ADS 2025U2; earlier versions untested
 - ADS-bundled Python 3.14 (for the `keysight.ads.de` native engine); wheels for result reading (`keysight.ads.dataset` cp310–cp314) ship in the ADS wheelhouse
 - An MCP client (Claude Desktop, ZCode, Cursor, or any stdio-MCP host)
 
@@ -178,15 +189,17 @@ The full narrated version of exactly this build lives in [`demo/step_by_step.py`
 
 End-to-end acceptance (MCP-level, `tests/test_full_flow.py`) on ADS 2027:
 
-- ✅ 23 tools registered and callable over stdio
+- ✅ 25 tools registered and callable over stdio
 - ✅ conversational build: 13 instances placed, netlist verified, simulation submitted/polled via task id
 - ✅ SI-LPF response: passband −0.08 dB, −3 dB cutoff **1.025 GHz** (design target 1 GHz), stopband −38 dB @ 6 GHz
 - ✅ Touchstone + PNG exports, GUI hand-off
+- ✅ LC topology library: 8 filters (LPF/HPF/BPF/BSF × Chebyshev/Butterworth) built and verified — Chebyshev LPF in-band ripple 0.10 dB, Butterworth cutoff 1.00 GHz, 0 layout collisions per cell
 
 ## Roadmap
 
 - [ ] Parameter sweeps & MeasEqn tools
 - [x] Optimizer hooks (geometry → spec closed-loop tuning)
+- [x] Layout audit & annotation auto-placement (KiCad eeschema-inspired)
 - [ ] EM (Momentum) flow
 - [ ] Multi-session registry (attach/audit concurrent ADS processes)
 - [ ] API doc search tool (complements the official server's `search_docs`)
@@ -195,6 +208,10 @@ End-to-end acceptance (MCP-level, `tests/test_full_flow.py`) on ADS 2027:
 ## Community
 
 Issues and PRs welcome — the codebase is small on purpose: three modules, no framework. If you build a design flow on top (synthesis, PCB co-sim, load-pull…), a demo script contribution is the best PR.
+
+## Acknowledgments
+
+The overlap audit (`ads_audit_schematic`) and label auto-placement (`ads_autolabel`) follow the approach of KiCad's eeschema field auto-placement (`eeschema/autoplace_fields.cpp`): bounding-box collision detection with severity-graded candidate placement. The algorithm idea was referenced, not copied — no KiCad code is included, and this project remains MIT. KiCad is © its contributors, licensed under GPL-3.0.
 
 ## License
 

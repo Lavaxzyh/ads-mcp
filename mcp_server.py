@@ -35,7 +35,7 @@ automatically before netlisting."""
 
 mcp = FastMCP("ads-mcp", instructions=INSTRUCTIONS)
 # FastMCP does not expose the server version; report ours instead of the SDK's
-mcp._mcp_server.version = "0.1.1"
+mcp._mcp_server.version = "0.2.0"
 engine = AdsEngine()
 state = SessionState(_HERE / "state" / "session_state.json")
 
@@ -359,6 +359,36 @@ def ads_plot_sparams(dataset: str = "", out_png: str = "", columns: list[str] | 
             raise RuntimeError("no dataset available; run a simulation first")
         out = out_png.strip() or str(Path(ds_path).with_suffix(".png"))
         return _ok(**engine.plot_sparams(ds_path, out, columns))
+    except Exception as exc:  # noqa: BLE001
+        return _err(exc)
+
+
+@mcp.tool()
+def ads_autolabel(max_pass: int = 4, step: float = 0.75) -> dict[str, Any]:
+    """Auto-place instance labels to clear text-level collisions (KiCad-style).
+
+    For each text collision, tries four candidate sides for the later
+    instance's annotation and moves it to the first collision-free spot.
+    Body-body collisions are reported only — fix those in the layout.
+    """
+    try:
+        return _ok(**engine.autolabel(max_pass=int(max_pass), step=float(step)))
+    except Exception as exc:  # noqa: BLE001
+        return _err(exc)
+
+
+@mcp.tool()
+def ads_audit_schematic(lib: str = "", cell: str = "") -> dict[str, Any]:
+    """Audit a schematic for overlapping elements (KiCad-style).
+
+    Compares every pair of instance bounding boxes (body vs annotation text)
+    and reports collisions by severity: body-body / body-text / text-text.
+    With lib+cell, audits the SAVED design read-only; without, audits the
+    current in-memory design. Aim for zero body-level collisions before
+    delivering a schematic.
+    """
+    try:
+        return _ok(**engine.audit_schematic(lib.strip() or None, cell.strip() or None))
     except Exception as exc:  # noqa: BLE001
         return _err(exc)
 
