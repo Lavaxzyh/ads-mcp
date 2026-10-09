@@ -41,7 +41,7 @@ ADS 2027 自带官方 MCP 服务器(`bin\ads-mcp.exe`):闭源、定位是**薄�
 - **会话状态落盘** —— JSON 状态机(idle → building → simulating → analyzing)，服务器重启可恢复、任务可追溯。
 - **真实导出** —— Touchstone `.s2p`、matplotlib PNG 曲线、数据集 → pandas。
 - **拓扑库** —— Butterworth/Chebyshev LC 梯形(LPF/HPF/BPF/BSF)由 g 参数综合、headless 搭建,每格对照理论验证。
-- **布局审计** —— KiCad 式重叠审计(`ads_audit_schematic`)+ 标注自动避让(`ads_autolabel`):交付原理图零本体碰撞、无悬空线头、无文字压符号。
+- **原理图审计** —— KiCad 式重叠审计(`ads_audit_schematic`)+ 标注自动避让(`ads_autolabel`):交付原理图零本体碰撞、无悬空线头、无文字压符号。
 
 ## 快速开始
 
@@ -116,7 +116,7 @@ cd ads-mcp
 
 
 
-### 布局审计(2)
+### 原理图审计(2)
 
 | 工具 | 功能 |
 |---|---|
@@ -185,13 +185,13 @@ MCP 层端到端验收(`tests/test_full_flow.py`，ADS 2027):
 - ✅ 对话式搭建:放置 13 个实例、网表核对、task id 提交/轮询仿真
 - ✅ SI-LPF 响应:通带 −0.08 dB，−3 dB 截止 **1.025 GHz**(设计目标 1 GHz)，6 GHz 处阻带 −38 dB
 - ✅ Touchstone + PNG 导出、GUI 交接
-- ✅ LC 拓扑库:8 个滤波器(LPF/HPF/BPF/BSF × Chebyshev/Butterworth)搭建并验证——Chebyshev LPF 带内纹波 0.10 dB、Butterworth 截止精确 1.00 GHz,每格布局 0 碰撞
+- ✅ LC 拓扑库:8 个滤波器(LPF/HPF/BPF/BSF × Chebyshev/Butterworth)搭建并验证——Chebyshev LPF 带内纹波 0.10 dB、Butterworth 截止精确 1.00 GHz,每格原理图 0 碰撞
 
 ## 路线图
 
 - [ ] 参数扫描与 MeasEqn 工具
 - [x] 优化器对接(几何 → 指标闭环调优)
-- [x] 布局审计与标注自动避让(参考 KiCad eeschema)
+- [x] 原理图审计与标注自动避让(参考 KiCad eeschema)
 - [ ] EM(Momentum)流程
 - [ ] 多会话注册表(并发 ADS 进程的挂接与审计)
 - [ ] API 文档检索工具(与官方服务器的 `search_docs` 互补)

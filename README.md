@@ -41,7 +41,7 @@ Both are stdio MCP servers; register both side by side if you like — this proj
 - **Persistent session state** — a JSON state machine (idle → building → simulating → analyzing) survives server restarts and records every task.
 - **Real exports** — Touchstone `.s2p`, matplotlib PNG plots, dataset → pandas.
 - **Topology library** — Butterworth/Chebyshev LC ladders (LPF/HPF/BPF/BSF) synthesized from g-parameters and built headlessly, every cell verified against theory.
-- **Layout audit** — KiCad-style overlap audit (`ads_audit_schematic`) plus annotation auto-placement (`ads_autolabel`) keep delivered schematics clean: zero body collisions, no dangling wire ends, no text-on-symbol grazes.
+- **Schematic audit** — KiCad-style overlap audit (`ads_audit_schematic`) plus annotation auto-placement (`ads_autolabel`) keep delivered schematics clean: zero body collisions, no dangling wire ends, no text-on-symbol grazes.
 
 ## Quick Start
 
@@ -124,7 +124,7 @@ This narrates a complete filter build (15 steps), simulates, exports, and opens 
 
 
 
-### Layout audit (2)
+### Schematic audit (2)
 
 | Tool | What it does |
 |---|---|
@@ -193,13 +193,13 @@ End-to-end acceptance (MCP-level, `tests/test_full_flow.py`) on ADS 2027:
 - ✅ conversational build: 13 instances placed, netlist verified, simulation submitted/polled via task id
 - ✅ SI-LPF response: passband −0.08 dB, −3 dB cutoff **1.025 GHz** (design target 1 GHz), stopband −38 dB @ 6 GHz
 - ✅ Touchstone + PNG exports, GUI hand-off
-- ✅ LC topology library: 8 filters (LPF/HPF/BPF/BSF × Chebyshev/Butterworth) built and verified — Chebyshev LPF in-band ripple 0.10 dB, Butterworth cutoff 1.00 GHz, 0 layout collisions per cell
+- ✅ LC topology library: 8 filters (LPF/HPF/BPF/BSF × Chebyshev/Butterworth) built and verified — Chebyshev LPF in-band ripple 0.10 dB, Butterworth cutoff 1.00 GHz, 0 schematic collisions per cell
 
 ## Roadmap
 
 - [ ] Parameter sweeps & MeasEqn tools
 - [x] Optimizer hooks (geometry → spec closed-loop tuning)
-- [x] Layout audit & annotation auto-placement (KiCad eeschema-inspired)
+- [x] Schematic audit & annotation auto-placement (KiCad eeschema-inspired)
 - [ ] EM (Momentum) flow
 - [ ] Multi-session registry (attach/audit concurrent ADS processes)
 - [ ] API doc search tool (complements the official server's `search_docs`)
