@@ -179,6 +179,12 @@ ads_open_in_gui()                                       # admire the schematic
 
 The full narrated version of exactly this build lives in [`demo/step_by_step.py`](demo/step_by_step.py).
 
+## Traffic
+
+![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png)
+
+Clone/view history is collected daily by [ghtraf](https://pypi.org/project/github-traffic-tracker/) and stored in a public Gist — permanent history beyond GitHub's 14-day traffic window. The live badges at the top of this README update from the same source.
+
 ## Requirements
 
 - Windows with a licensed Keysight ADS installation — verified end-to-end on ADS 2027 (v6.5.0); uses the `keysight.ads.de` Python API provided by Keysight since ADS 2025U2; earlier versions untested

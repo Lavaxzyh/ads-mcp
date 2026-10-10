@@ -765,4 +765,11 @@ jobs:
             console.log(`\nBadge URLs (after setting GIST_ID):`);
             const gid = gistId || "<GIST_ID>";
             console.log(`Installs: https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/${owner}/${gid}/raw/installs.json`);
+      - name: Render clones-history curve into the gist
+        env:
+          GIST_ID: ${{ vars.TRAFFIC_GIST_ID }}
+          GITHUB_TOKEN: ${{ secrets.TRAFFIC_GIST_TOKEN }}
+        run: |
+          python -m pip install --quiet matplotlib
+          python tools/plot_clones_history.py --gist
 

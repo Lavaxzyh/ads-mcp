@@ -171,6 +171,12 @@ ads_open_in_gui()                                       # 打开 GUI 欣赏
 
 这套构建的完整旁白版在 [`demo/step_by_step.py`](demo/step_by_step.py)。
 
+## 流量
+
+![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png)
+
+克隆/浏览历史由 [ghtraf](https://pypi.org/project/github-traffic-tracker/) 每日采集并存入公开 Gist——永久历史，突破 GitHub 仅保留 14 天流量数据的限制。README 顶部的实时徽章同源更新。
+
 ## 环境要求
 
 - Windows 及已授权安装的 Keysight ADS——已在 ADS 2027(v6.5.0)上完整验证;所用 Python API 基于 Keysight 自 2025U2 起提供的 `keysight.ads.de`，更早版本未经测试
