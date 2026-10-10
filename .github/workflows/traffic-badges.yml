@@ -765,6 +765,9 @@ jobs:
             console.log(`\nBadge URLs (after setting GIST_ID):`);
             const gid = gistId || "<GIST_ID>";
             console.log(`Installs: https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/${owner}/${gid}/raw/installs.json`);
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Render clones-history curve into the gist
         env:
           GIST_ID: ${{ vars.TRAFFIC_GIST_ID }}
