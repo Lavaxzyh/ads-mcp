@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""Plot the clones history curve from the ghtraf badge Gist.
+"""Render the clones-history curve from the ghtraf badge Gist's state.json.
 
-Data source: the public badge Gist's state.json (permanent daily history,
-beyond GitHub's 14-day traffic window).
+Data source: the public badge Gist (permanent daily history, beyond GitHub's
+14-day traffic window). Public gist content is readable without auth.
 
-Modes:
-  python plot_clones_history.py [state.json] [out.png]   # local file -> local png
-  python plot_clones_history.py --gist                    # fetch gist, render, upload back
+Usage:
+    python plot_clones_history.py [state.json] [out.png]   # local file
+    python plot_clones_history.py --render [out.png]       # fetch state.json, render only
 
---gist mode needs GIST_ID and GITHUB_TOKEN (a PAT with gist scope) in env.
-In GitHub Actions the workflow provides both.
+The rendered PNG is binary; GitHub's Gist REST API only accepts UTF-8 text
+content, so uploading is done over the gist's git remote (see .github/workflows).
 """
-import base64
 import json
-import os
 import sys
 import urllib.request
 from datetime import datetime
@@ -27,40 +25,14 @@ import matplotlib.dates as mdates
 plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "DejaVu Sans"]
 
 GIST_ID = "ec682cff6f482626fa5348189838e66b"
-PNG_NAME = "clones-history.png"
-OUT = Path(__file__).resolve().parent.parent / "assets" / PNG_NAME
-API = "https://api.github.com"
+RAW = f"https://gist.githubusercontent.com/Lavaxzyh/{GIST_ID}/raw/state.json"
+OUT = Path(__file__).resolve().parent.parent / "assets" / "clones-history.png"
 
 
-# ---------------- gist IO ----------------
-
-def _request(method: str, url: str, token: str, body: dict | None = None) -> dict:
-    req = urllib.request.Request(
-        url,
-        method=method,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-        data=json.dumps(body).encode() if body is not None else None,
-    )
-    with urllib.request.urlopen(req) as resp:
+def fetch_state() -> dict:
+    with urllib.request.urlopen(RAW, timeout=30) as resp:
         return json.loads(resp.read().decode())
 
-
-def fetch_state(gist_id: str, token: str) -> dict:
-    gist = _request("GET", f"{API}/gists/{gist_id}", token)
-    return json.loads(gist["files"]["state.json"]["content"])
-
-
-def upload_png(gist_id: str, token: str, png: Path) -> None:
-    content = base64.b64encode(png.read_bytes()).decode()
-    _request("PATCH", f"{API}/gists/{gist_id}", token,
-             {"files": {PNG_NAME: {"content": content}}})
-
-
-# ---------------- data + plot ----------------
 
 def load_history(data: dict) -> list[dict]:
     raw = data.get("dailyHistory") or {}
@@ -111,21 +83,14 @@ def plot(days: list[dict], out: Path) -> dict:
 
 
 def main() -> None:
-    if "--gist" in sys.argv:
-        gist_id = os.environ.get("GIST_ID", GIST_ID)
-        token = os.environ["GITHUB_TOKEN"]
-        data = fetch_state(gist_id, token)
-        info = plot(load_history(data), OUT)
-        upload_png(gist_id, token, OUT)
-        info["uploaded_to_gist"] = gist_id
-        print(json.dumps(info, indent=1))
-        return
-    src = sys.argv[1] if len(sys.argv) > 1 else None
-    dst = Path(sys.argv[2]) if len(sys.argv) > 2 else OUT
-    if src:
-        data = json.loads(Path(src).read_text(encoding="utf-8"))
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if "--render" in sys.argv:
+        data = fetch_state()
+    elif args:
+        data = json.loads(Path(args[0]).read_text(encoding="utf-8"))
     else:
-        data = fetch_state(GIST_ID, os.environ["GITHUB_TOKEN"])
+        data = fetch_state()
+    dst = Path(args[0]) if args else OUT
     print(json.dumps(plot(load_history(data), dst), indent=1))
 
 

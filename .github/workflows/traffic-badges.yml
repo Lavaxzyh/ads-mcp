@@ -768,11 +768,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Render clones-history curve into the gist
+      - name: Render clones-history curve and push to the gist
         env:
           GIST_ID: ${{ vars.TRAFFIC_GIST_ID }}
           GITHUB_TOKEN: ${{ secrets.TRAFFIC_GIST_TOKEN }}
         run: |
           python -m pip install --quiet matplotlib
-          python tools/plot_clones_history.py --gist
+          python tools/plot_clones_history.py --render
+          git clone -q "https://x-access-token:${GITHUB_TOKEN}@gist.github.com/${GIST_ID}.git" gistcurve
+          cp assets/clones-history.png gistcurve/
+          cd gistcurve
+          git -c user.name="ghtraf" -c user.email="ghtraf@users.noreply.github.com" commit -q -am "update clones history curve" || echo "curve unchanged"
+          git push -q origin HEAD
 
