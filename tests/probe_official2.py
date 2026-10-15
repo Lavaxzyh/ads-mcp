@@ -1,10 +1,16 @@
 """Dump the official ads-mcp.exe tools/list + instructions in full."""
 import json
 import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
 
-EXE = r"D:\Program Files\Keysight\ADS2027\bin\ads-mcp.exe"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from ads_engine import get_ads_install_dir
+
+EXE = str(get_ads_install_dir() / "bin" / "ads-mcp.exe")
 proc = subprocess.Popen([EXE], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                         stderr=subprocess.DEVNULL, text=True, encoding="utf-8")
 lines = []

@@ -26,7 +26,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-DEFAULT_HPEESOF_DIR = r"D:\Program Files\Keysight\ADS2027"
+DEFAULT_HPEESOF_DIR = str(Path(os.environ.get("ProgramFiles") or "C:/Program Files") / "Keysight" / "ADS2027")
 
 #Cells whose parameter names we know; browse_components() merges this with
 #on-disk enumeration so the agent always sees authoritative parameter lists
@@ -54,11 +54,24 @@ _SUBSTRATE_DEFAULT_NAME = "MSub1"
 _STR_REFERENCE_PARAMS = {"Subst"}  # string params whose netlist quoting must stay default
 
 
+def get_ads_install_dir() -> Path:
+    """Use the configured ADS installation or the standard Program Files path."""
+    return Path(os.environ.get("HPEESOF_DIR") or DEFAULT_HPEESOF_DIR).expanduser().resolve()
+
+
+def get_workroot() -> Path:
+    """Resolve the configurable demo/output root without creating directories."""
+    return Path(os.environ.get("ADS_MCP_WORKROOT") or Path.home() / "ads_mcp_demo").expanduser().resolve()
+
+
 def ensure_env() -> str:
-    hpeesof_dir = os.environ.get("HPEESOF_DIR") or DEFAULT_HPEESOF_DIR
-    os.environ["HPEESOF_DIR"] = hpeesof_dir
+    hpeesof_dir = str(get_ads_install_dir())
     if not Path(hpeesof_dir, "bin", "hpeesofsim.exe").exists():
-        raise FileNotFoundError(f"hpeesofsim.exe not found under {hpeesof_dir}")
+        raise FileNotFoundError(
+            f"hpeesofsim.exe not found under {hpeesof_dir}; "
+            "set HPEESOF_DIR to your ADS installation directory"
+        )
+    os.environ["HPEESOF_DIR"] = hpeesof_dir
     return hpeesof_dir
 
 
@@ -777,7 +790,7 @@ class AdsEngine:
     def browse_components(self, lib: str | None = None) -> dict[str, Any]:
         libs: dict[str, list[str]] = {}
         if lib is None:
-            rf_root = Path(os.environ.get("HPEESOF_DIR", DEFAULT_HPEESOF_DIR)) / "oalibs" / "rf"
+            rf_root = get_ads_install_dir() / "oalibs" / "rf"
             if rf_root.exists():
                 for entry in sorted(rf_root.iterdir()):
                     if entry.is_dir() and not entry.name.startswith("%"):
@@ -790,7 +803,7 @@ class AdsEngine:
             for key, info in KNOWN_COMPONENTS.items()
             if key.split(":")[0] == lib
         }
-        lib_dir = Path(os.environ.get("HPEESOF_DIR", DEFAULT_HPEESOF_DIR)) / "oalibs" / "rf" / lib
+        lib_dir = get_ads_install_dir() / "oalibs" / "rf" / lib
         cells = self._cells_in_oa_lib(lib_dir) if lib_dir.exists() else []
         return {"library": lib, "cells": cells, "known_components": known}
 

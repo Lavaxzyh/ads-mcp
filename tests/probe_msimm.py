@@ -2,12 +2,16 @@
 import os, sys, shutil
 from pathlib import Path
 
-os.environ.setdefault("HPEESOF_DIR", r"D:\Program Files\Keysight\ADS2027")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from ads_engine import ensure_env, get_workroot
+
+ensure_env()
 
 from keysight.ads import de
 from keysight.ads.de import db_uu
 
-WS = Path(r"D:\ADS_Project\ads_mcp_probe\probe_wrk")
+WS = get_workroot() / "probe_wrk"
 if WS.exists():
     shutil.rmtree(WS, ignore_errors=True)
 WS.parent.mkdir(parents=True, exist_ok=True)

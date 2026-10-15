@@ -27,6 +27,42 @@ class ServerTests(unittest.TestCase):
         }
         self.assertEqual(server._last_dataset_from_tasks(), "new.ds")
 
+    def test_default_workspace_uses_configured_workroot(self):
+        root = Path(self.tmp.name) / "outputs"
+        expected = str(root / "work_wrk")
+        self.engine.create_workspace.return_value = {"workspace": expected}
+        with patch.object(server, "get_workroot", return_value=root):
+            result = server.ads_create_workspace()
+        self.assertTrue(result["ok"])
+        self.engine.create_workspace.assert_called_once_with(expected)
+
+    def test_explicit_workspace_overrides_workroot(self):
+        expected = str(Path(self.tmp.name) / "explicit_wrk")
+        self.engine.create_workspace.return_value = {"workspace": expected}
+        with patch.object(server, "get_workroot") as default:
+            result = server.ads_create_workspace(expected)
+        self.assertTrue(result["ok"])
+        self.engine.create_workspace.assert_called_once_with(expected)
+        default.assert_not_called()
+
+    def test_simulation_output_default_and_explicit_paths(self):
+        root = Path(self.tmp.name) / "outputs"
+        workspace = root / "example_wrk"
+        self.engine.generate_netlist.return_value = {"netlist": "test netlist"}
+        with patch.object(self.state, "submit", return_value="simulation_test"), patch.object(
+            server, "get_workroot", return_value=root
+        ):
+            for ws, output, expected in [
+                (None, "", root / "sim_out"),
+                (str(workspace), "", root / "sim_out"),
+                (str(workspace), str(root / "explicit"), root / "explicit"),
+            ]:
+                with self.subTest(workspace=ws, output=output):
+                    self.state.set_field("workspace_path", ws)
+                    result = server.ads_run_simulation(output)
+                    self.assertTrue(result["ok"], result)
+                    self.assertEqual(result["output_dir"], str(expected))
+
     def test_same_second_completion_prefers_later_task(self):
         self.state._data["tasks"] = {
             "old": {"status": "done", "finished_at": "same", "result": {"dataset": "old.ds"}},

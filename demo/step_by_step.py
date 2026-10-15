@@ -12,10 +12,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ads_engine import AdsEngine  # noqa: E402
+from ads_engine import AdsEngine, get_workroot  # noqa: E402
 
-WS = Path(r"D:\ADS_Project\ads_mcp_demo\si_lpf_final2_wrk")
-OUT = Path(r"D:\ADS_Project\ads_mcp_demo\sim_out_step")
+WORKROOT = get_workroot()
+WS = WORKROOT / "si_lpf_step_wrk"
+OUT = WORKROOT / "sim_out_step"
 
 step_no = 0
 

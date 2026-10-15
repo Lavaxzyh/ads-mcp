@@ -17,12 +17,11 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ads_engine import AdsEngine, DEFAULT_HPEESOF_DIR, ensure_env
+from ads_engine import AdsEngine, ensure_env, get_ads_install_dir, get_workroot
 from momentum import MomentumRunner, inspect_setup
 from session_state import SessionState, StateError
 
 _HERE = Path(__file__).resolve().parent
-DEFAULT_WORKROOT = r"D:\ADS_Project\ads_mcp_demo"
 
 INSTRUCTIONS = """Drive Keysight ADS (Advanced Design System) for
 RF/microwave schematic work.  Typical loop: ads_check_installed ->
@@ -47,7 +46,7 @@ mcp = FastMCP("ads-mcp", instructions=INSTRUCTIONS)
 mcp._mcp_server.version = "0.3.0"
 engine = AdsEngine()
 state = SessionState(Path(os.environ.get("ADS_MCP_STATE_FILE") or _HERE / "state" / "session_state.json"))
-momentum = MomentumRunner(Path(os.environ.get("HPEESOF_DIR") or DEFAULT_HPEESOF_DIR) / "bin" / "ads-mcp.exe")
+momentum = MomentumRunner(get_ads_install_dir() / "bin" / "ads-mcp.exe")
 _workspace_dispatch_lock = threading.RLock()
 
 
@@ -90,7 +89,7 @@ def ads_create_workspace(path: str = "") -> dict[str, Any]:
     """Create (or open if existing) an ADS workspace at `path` and open it."""
     try:
         _ensure_no_running_tasks()
-        target = path.strip() or str(Path(DEFAULT_WORKROOT) / "work_wrk")
+        target = path.strip() or str(get_workroot() / "work_wrk")
         result = engine.create_workspace(target)
         state.set_field("workspace_path", result["workspace"])
         state.set_field("current_schematic", None)
@@ -313,7 +312,7 @@ def ads_run_simulation(output_dir: str = "") -> dict[str, Any]:
         netlist_result = engine.generate_netlist()
         state.transition("simulating")
         out_dir = output_dir.strip() or str(
-            Path(str(ws or DEFAULT_WORKROOT)).parent / "sim_out"
+            (Path(ws).parent if ws else get_workroot()) / "sim_out"
         )
 
         def _run() -> dict[str, Any]:

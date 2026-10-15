@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import shutil
+import sys
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -15,9 +16,13 @@ from mcp.client.stdio import stdio_client
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-PYTHON = str(REPO / ".venv" / "Scripts" / "python.exe")
+sys.path.insert(0, str(REPO))
+
+from ads_engine import get_workroot  # noqa: E402
+
+PYTHON = sys.executable
 SERVER = str(REPO / "mcp_server.py")
-WS = str(Path.home() / "ads_mcp_demo" / "acceptance_wrk")
+WS = str(get_workroot() / "acceptance_wrk")
 
 X = [0.5, 2.0, 3.5, 5.0, 6.5, 8.0]
 SEG = [("Wh", "Lh"), ("Wl", "Ll"), ("Wh", "Lh"), ("Wl", "Ll"), ("Wh", "Lh"), ("Wl", "Ll")]
@@ -37,7 +42,7 @@ async def call(session, tool, args):
 async def main() -> None:
     params = StdioServerParameters(
         command=PYTHON, args=[SERVER],
-        env={**os.environ, "HPEESOF_DIR": r"D:\Program Files\Keysight\ADS2027"},
+        env=dict(os.environ),
     )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:

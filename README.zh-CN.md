@@ -64,6 +64,23 @@ cd ads-mcp
 
 将配置中的仓库路径和 ADS 安装路径替换为本机绝对路径，保存后重启 MCP 客户端（如 Claude Desktop、ZCode 或 Cursor），即可加载 28 个 `ads_*` 工具。
 
+### 路径配置
+
+| 配置项 | 用途 | 未配置时 |
+|---|---|---|
+| `HPEESOF_DIR` | ADS 安装目录，电路工具与 Momentum 桥接共用 | 系统 `ProgramFiles` 下的 `Keysight/ADS2027` |
+| `ADS_MCP_WORKROOT` | 示例输出根目录，以及省略 `ads_create_workspace.path` 时使用的根目录 | 当前用户主目录下的 `ads_mcp_demo` |
+| `ADS_MCP_STATE_FILE` | MCP 会话与任务状态 JSON 文件 | 仓库中的 `state/session_state.json` |
+
+可在 MCP 客户端的 `env` 中设置这些变量。直接运行脚本时，也可在 PowerShell 中先设置：
+
+```powershell
+$env:HPEESOF_DIR = "C:\Program Files\Keysight\ADS2027"
+$env:ADS_MCP_WORKROOT = Join-Path $HOME "ads_mcp_demo"
+```
+
+请按实际安装位置调整 `HPEESOF_DIR`。显式传入的工作区或输出路径优先于默认路径；Momentum 始终使用调用时指定的已有工程。
+
 ### 运行示例脚本
 
 也可直接运行示例脚本，无需配置 AI 客户端：
@@ -72,7 +89,7 @@ cd ads-mcp
 .venv\Scripts\python.exe demo\step_by_step.py
 ```
 
-该脚本分 15 步演示滤波器搭建、仿真和结果导出，并在 ADS GUI 中打开生成的工程。运行前请检查脚本中的 `WS`、`OUT` 路径；脚本会删除并重建这两个示例目录。
+该脚本分 15 步演示滤波器搭建、仿真和结果导出，并在 ADS GUI 中打开生成的工程。输出位于 `ADS_MCP_WORKROOT`（默认当前用户主目录下的 `ads_mcp_demo`）。运行前请检查脚本中的 `WS`、`OUT` 子目录；脚本会删除并重建这两个示例目录。
 
 ## 工具列表（28 个）
 
@@ -216,7 +233,7 @@ ADS 2027 上的电路/拓扑验收（`tests/test_full_flow.py`）及 v0.3.0 Mome
 - 电路示例结果：通带约 −0.08 dB，首个低于 −3 dB 的频点为 **1.025 GHz**（设计目标 1 GHz），6 GHz 处响应约 −38 dB。
 - 结果交付：Touchstone 与 PNG 导出，以及在 ADS GUI 中打开工程。
 - LC 滤波器示例：验证 Butterworth、Chebyshev 两类响应与四种滤波类型的 8 种组合。示例结果包括 Chebyshev 低通带内纹波约 0.10 dB、Butterworth 截止频率约 1.00 GHz，审计未报告元件本体碰撞。
-- 单元与回归检查：44 项通过，覆盖状态恢复、重复启动防护、结果归档和导出等行为。
+- 单元与回归检查：56 项通过，覆盖路径配置、状态恢复、重复启动防护、结果归档和导出等行为。
 - 原生 Momentum：0.05–4.00 GHz、396 点，频点网格核对、服务重启后继续
   监控及结果导出。
 

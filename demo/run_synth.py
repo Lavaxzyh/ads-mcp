@@ -13,9 +13,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ads_engine import AdsEngine  # noqa: E402
+from ads_engine import AdsEngine, get_workroot  # noqa: E402
 
-WORKROOT = Path(r"D:\ADS_Project\ads_mcp_demo")
+WORKROOT = get_workroot()
 WS = WORKROOT / "si_lpf_synth_wrk"
 OUT = WORKROOT / "sim_out_synth"
 

@@ -64,6 +64,23 @@ cd ads-mcp
 
 Replace the repository and ADS paths with local absolute paths, save the configuration, and restart your MCP client, such as Claude Desktop, ZCode, or Cursor, to load the 28 `ads_*` tools.
 
+### Path Configuration
+
+| Setting | Purpose | Default |
+|---|---|---|
+| `HPEESOF_DIR` | ADS installation used by circuit tools and the Momentum bridge | `Keysight/ADS2027` under the system `ProgramFiles` directory |
+| `ADS_MCP_WORKROOT` | Example output root and the root used when `ads_create_workspace.path` is omitted | `ads_mcp_demo` under the current user's home directory |
+| `ADS_MCP_STATE_FILE` | MCP session and task state JSON file | `state/session_state.json` in the repository |
+
+Set these variables in the MCP client's `env` configuration. To run scripts directly, you can also set them in PowerShell:
+
+```powershell
+$env:HPEESOF_DIR = "C:\Program Files\Keysight\ADS2027"
+$env:ADS_MCP_WORKROOT = Join-Path $HOME "ads_mcp_demo"
+```
+
+Adjust `HPEESOF_DIR` to your installation. Explicit workspace and output arguments take precedence over defaults. Momentum always uses the existing workspace specified in the call.
+
 ### Run the Example Script
 
 You can also run the example script directly, without configuring an AI client:
@@ -72,7 +89,7 @@ You can also run the example script directly, without configuring an AI client:
 .venv\Scripts\python.exe demo\step_by_step.py
 ```
 
-The script demonstrates filter construction, simulation, and result export in 15 steps, then opens the generated project in ADS GUI. Check its `WS` and `OUT` paths before running: the script deletes and recreates both example directories.
+The script demonstrates filter construction, simulation, and result export in 15 steps, then opens the generated project in ADS GUI. Output is under `ADS_MCP_WORKROOT`, which defaults to `ads_mcp_demo` in the current user's home directory. Check the script's `WS` and `OUT` subdirectories before running: the script deletes and recreates both example directories.
 
 ## Tool Reference (28 Tools)
 
@@ -216,7 +233,7 @@ validation (`demo/run_momentum.py`) on ADS 2027:
 - Circuit example response: approximately −0.08 dB in the passband, first sampled frequency below −3 dB at **1.025 GHz** (1 GHz design target), and approximately −38 dB at 6 GHz.
 - Result delivery: Touchstone and PNG export, and opening the project in ADS GUI.
 - LC filter examples: eight combinations of Butterworth and Chebyshev responses with four filter types. Example results include approximately 0.10 dB Chebyshev low-pass ripple and a 1.00 GHz Butterworth cutoff, with no component body collisions reported by the audit.
-- Unit and regression checks: 44 passed, covering state recovery, duplicate dispatch prevention, result capture, and export behavior.
+- Unit and regression checks: 56 passed, covering path configuration, state recovery, duplicate dispatch prevention, result capture, and export behavior.
 - Native Momentum: 0.05–4.00 GHz, 396 points, frequency-grid verification,
   server-restart monitoring, and result exports.
 

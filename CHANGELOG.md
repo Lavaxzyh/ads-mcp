@@ -16,6 +16,11 @@
 
 ### Fixed
 
+- Replace machine-specific installation/workspace paths with `HPEESOF_DIR`,
+  the system Program Files default, and a configurable `ADS_MCP_WORKROOT`
+  (defaulting to `ads_mcp_demo` under the current user's home directory).
+- Integration scripts inherit the configured ADS environment and use the
+  interpreter that runs them instead of a fixed repository virtual environment.
 - Select the latest completed task's dataset instead of the first task.
 - Select S-parameter varblocks in both circuit and Momentum datasets, sort
   their frequency axes, and reject ambiguous or invalid axes.

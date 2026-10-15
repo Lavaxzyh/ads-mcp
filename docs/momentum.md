@@ -6,6 +6,11 @@ bridge and the AEL `deem_run_em_setup` path verified on ADS 2027 (v6.5.0).
 Keysight's executable, XML templates, OA designs and licenses are not included
 in this repository.
 
+Set `HPEESOF_DIR` to the local ADS installation directory if it is not under
+the system `ProgramFiles/Keysight/ADS2027` default. The GUI bridge and circuit
+tools use the same installation setting. `ADS_MCP_WORKROOT` controls circuit
+example outputs; it does not change the existing workspace passed to Momentum.
+
 ## Prepare the project
 
 1. Prepare and save the layout, substrate, ports and native EM Setup in ADS.

@@ -27,10 +27,10 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from ads_engine import AdsEngine  # noqa: E402
+from ads_engine import AdsEngine, get_workroot  # noqa: E402
 import lc_synth as S  # noqa: E402
 
-WORKROOT = Path(r"D:\ADS_Project\ads_mcp_demo")
+WORKROOT = get_workroot()
 WS = WORKROOT / "lc_filters_wrk"
 if len(sys.argv) > 1:  # 可选:python build_lc_filters.py <workspace-name>
     WS = WORKROOT / sys.argv[1]
