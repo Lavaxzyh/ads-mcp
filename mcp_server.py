@@ -1,26 +1,30 @@
 #!/usr/bin/env python3
-"""ads-mcp: an open, headless-first MCP server for Keysight ADS.
+"""ads-mcp: structured design and simulation tools for Keysight ADS.
 
 Built on keysight.ads.de (the official Python API shipped with ADS 2027).
-v0.1 focuses on the microstrip schematic -> S-parameter simulation loop.
+Circuit simulation and native Momentum simulation with an ADS GUI session.
 
 Run:  <ads-mcp>/.venv/Scripts/python.exe mcp_server.py   (stdio transport)
 """
 from __future__ import annotations
 
 import json
+import os
+import functools
+import threading
 from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ads_engine import AdsEngine, ensure_env
+from ads_engine import AdsEngine, DEFAULT_HPEESOF_DIR, ensure_env
+from momentum import MomentumRunner, inspect_setup
 from session_state import SessionState, StateError
 
 _HERE = Path(__file__).resolve().parent
 DEFAULT_WORKROOT = r"D:\ADS_Project\ads_mcp_demo"
 
-INSTRUCTIONS = """Drive Keysight ADS (Advanced Design System) headlessly for
+INSTRUCTIONS = """Drive Keysight ADS (Advanced Design System) for
 RF/microwave schematic work.  Typical loop: ads_check_installed ->
 ads_create_workspace -> ads_create_library -> ads_create_schematic ->
 ads_place_component / ads_add_wire / ads_add_var / ads_add_term (build the
@@ -31,13 +35,28 @@ ads_browse_components to discover library/cell/parameter names before placing
 unfamiliar parts.  Microstrip cells (MLIN, MSUB, MTEE, ...) live in
 `ads_tlines`; controllers and ports in `ads_simulation`; VAR/MeasEqn in
 `ads_datacmps`.  Simulation requires the schematic on file: the tools save
-automatically before netlisting."""
+automatically before netlisting. For Momentum, prepare a native EM Setup in
+ADS, open its workspace in an ADS GUI session, call ads_list_gui_sessions and
+ads_inspect_momentum_setup, then ads_run_momentum and poll ads_get_sim_status.
+Close any workspace owned by this server with ads_close_workspace before
+using the GUI Momentum path. The tools validate saved setups and do not
+generate arbitrary layouts, substrates or RFPro views."""
 
 mcp = FastMCP("ads-mcp", instructions=INSTRUCTIONS)
 # FastMCP does not expose the server version; report ours instead of the SDK's
-mcp._mcp_server.version = "0.2.0"
+mcp._mcp_server.version = "0.3.0"
 engine = AdsEngine()
-state = SessionState(_HERE / "state" / "session_state.json")
+state = SessionState(Path(os.environ.get("ADS_MCP_STATE_FILE") or _HERE / "state" / "session_state.json"))
+momentum = MomentumRunner(Path(os.environ.get("HPEESOF_DIR") or DEFAULT_HPEESOF_DIR) / "bin" / "ads-mcp.exe")
+_workspace_dispatch_lock = threading.RLock()
+
+
+def _serialize_workspace(fn):
+    @functools.wraps(fn)
+    def wrapped(*args, **kwargs):
+        with _workspace_dispatch_lock:
+            return fn(*args, **kwargs)
+    return wrapped
 
 
 def _ok(**kwargs: Any) -> dict[str, Any]:
@@ -51,6 +70,11 @@ def _err(exc: Exception, **context: Any) -> dict[str, Any]:
     return out
 
 
+def _ensure_no_running_tasks() -> None:
+    if any(t["status"] == "running" for t in state.snapshot()["tasks"].values()):
+        raise StateError("a simulation task is running; poll ads_get_sim_status before changing workspaces or starting another")
+
+
 @mcp.tool()
 def ads_check_installed() -> dict[str, Any]:
     """Check ADS install, simulator binary, and the headless DE engine."""
@@ -61,9 +85,11 @@ def ads_check_installed() -> dict[str, Any]:
 
 
 @mcp.tool()
+@_serialize_workspace
 def ads_create_workspace(path: str = "") -> dict[str, Any]:
     """Create (or open if existing) an ADS workspace at `path` and open it."""
     try:
+        _ensure_no_running_tasks()
         target = path.strip() or str(Path(DEFAULT_WORKROOT) / "work_wrk")
         result = engine.create_workspace(target)
         state.set_field("workspace_path", result["workspace"])
@@ -75,9 +101,11 @@ def ads_create_workspace(path: str = "") -> dict[str, Any]:
 
 
 @mcp.tool()
+@_serialize_workspace
 def ads_open_workspace(path: str) -> dict[str, Any]:
     """Open an existing ADS workspace."""
     try:
+        _ensure_no_running_tasks()
         result = engine.open_workspace(path)
         state.set_field("workspace_path", result["workspace"])
         state.set_field("current_schematic", None)
@@ -88,9 +116,11 @@ def ads_open_workspace(path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+@_serialize_workspace
 def ads_close_workspace() -> dict[str, Any]:
     """Close the currently open workspace."""
     try:
+        _ensure_no_running_tasks()
         result = engine.close_workspace()
         state.set_field("workspace_path", None)
         state.set_field("current_schematic", None)
@@ -269,6 +299,7 @@ def ads_generate_netlist(save: bool = True) -> dict[str, Any]:
 
 
 @mcp.tool()
+@_serialize_workspace
 def ads_run_simulation(output_dir: str = "") -> dict[str, Any]:
     """Save the schematic, netlist it, and run hpeesofsim in the background.
 
@@ -276,6 +307,7 @@ def ads_run_simulation(output_dir: str = "") -> dict[str, Any]:
     dataset path for ads_get_results / ads_plot_sparams / ads_export_touchstone.
     """
     try:
+        _ensure_no_running_tasks()
         ws = state.get("workspace_path")
         engine.save_schematic()
         netlist_result = engine.generate_netlist()
@@ -304,13 +336,68 @@ def ads_run_simulation(output_dir: str = "") -> dict[str, Any]:
 
 @mcp.tool()
 def ads_get_sim_status(task_id: str) -> dict[str, Any]:
-    """Poll a simulation task submitted with ads_run_simulation."""
+    """Poll circuit or Momentum tasks. Momentum reports live frequency progress.
+
+    Momentum monitoring survives server restarts; polling does not relaunch
+    the solver. A bridge timeout is uncertain dispatch, never a retry signal.
+    """
     try:
         st = state.task_status(task_id)
+        if st["kind"] == "momentum":
+            st = momentum.poll(state, task_id, engine.validate_momentum_dataset)
+        st.pop("monitor", None)
         return _ok(**st)
     except KeyError as exc:
         return _err(exc)
     except Exception as exc:  # noqa: BLE001
+        return _err(exc)
+
+
+@mcp.tool()
+def ads_list_gui_sessions() -> dict[str, Any]:
+    """Discover running ADS GUI sessions through installed Keysight ads-mcp.exe.
+
+    Returns session IDs and workspace paths. Does not start or close ADS.
+    """
+    try:
+        return _ok(**momentum.list_sessions())
+    except Exception as exc:
+        return _err(exc)
+
+
+@mcp.tool()
+def ads_inspect_momentum_setup(workspace: str, setup_file: str, setup: str = "emSetup") -> dict[str, Any]:
+    """Inspect a saved native Momentum setup, its layout, paths and linear sweep.
+
+    setup_file is the canonical emStateFile.xml inside the EM Setup cellview,
+    not the generated copy under simulation/. Requires an existing local
+    library and saved layout, native calculation type 5 and one linear sweep
+    (verified on ADS 2027). Reports stale copied workspace references; no edits.
+    """
+    try:
+        return _ok(**inspect_setup(workspace, setup_file, setup))
+    except Exception as exc:
+        return _err(exc)
+
+
+@mcp.tool()
+@_serialize_workspace
+def ads_run_momentum(session_id: int, workspace: str, setup_file: str, setup: str = "emSetup") -> dict[str, Any]:
+    """Run an existing native Momentum setup in the selected ADS GUI session.
+
+    Open the requested workspace in that GUI first. Close any workspace
+    owned by this server with ads_close_workspace. The tool verifies the GUI
+    workspace/library/setup link, returns task_id, and never closes ADS or
+    silently switches workspaces. Poll ads_get_sim_status for fresh outputs
+    and configured frequency-grid validation. No automated setup creation or
+    RFPro execution is provided. A reservation prevents duplicate dispatches.
+    """
+    try:
+        _ensure_no_running_tasks()
+        if engine.workspace_path is not None:
+            raise StateError("close this server's workspace with ads_close_workspace before running Momentum in ADS GUI")
+        return _ok(**momentum.start(state, session_id, workspace, setup_file, setup))
+    except Exception as exc:
         return _err(exc)
 
 
@@ -331,7 +418,8 @@ def ads_get_results(dataset: str = "", varblock: str = "") -> dict[str, Any]:
 
 
 def _last_dataset_from_tasks() -> str:
-    for st in state.snapshot()["tasks"].values():
+    tasks = list(state.snapshot()["tasks"].values())
+    for st in sorted(reversed(tasks), key=lambda t: t.get("finished_at") or "", reverse=True):
         if st["status"] == "done" and st.get("result", {}).get("dataset"):
             return st["result"]["dataset"]
     return ""

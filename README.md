@@ -2,7 +2,7 @@
 
 ![Clones](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones.json) ![Views](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/views.json) ![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/installs.json)
 
-**An open, headless-first MCP server for Keysight ADS** — build RF/microwave schematics, netlist, simulate, and read S-parameters without ever opening the GUI.
+**An open-source MCP server for Keysight ADS**, providing tools for RF and microwave schematic construction, circuit simulation, Momentum simulation, and S-parameter processing.
 
 English · [简体中文](README.zh-CN.md)
 
@@ -10,53 +10,45 @@ English · [简体中文](README.zh-CN.md)
 ![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)
 ![ADS](https://img.shields.io/badge/Tested_on_Keysight_ADS_2027-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tools](https://img.shields.io/badge/Tools-25-4c1)
+![Tools](https://img.shields.io/badge/Tools-28-4c1)
 
-> Not affiliated with or endorsed by Keysight Technologies. Requires your own licensed ADS installation — this repo ships no Keysight code or binaries.
+> This is an independent open-source project, not an official Keysight product. A separately installed copy of Keysight ADS with a valid license is required. This repository does not distribute ADS software or its proprietary components.
 
-## Why This Exists
+## Overview
 
-ADS 2027 ships an official MCP server (`bin\ads-mcp.exe`): closed-source, and built as a **thin generic REPL** — one `execute_python` tool over the full ADS Python API. Powerful, but the agent must already know the API and write code for every step.
+**ads-mcp v0.3.0** exposes ADS design and simulation operations through **28 MCP tools**, each with defined input parameters. It also records session and simulation task state.
 
-**ads-mcp** takes the opposite approach: the design workflow itself is encoded as **25 named, schema-documented tools** with guardrails, so an agent that has never seen the ADS Python API can run the full loop — schematic → netlist → `hpeesofsim` → S-parameters — conversationally.
+The circuit workflow covers schematic construction, netlist generation, `hpeesofsim` execution, and S-parameter processing. The Momentum workflow runs an **existing saved native EM Setup** in a specified ADS GUI session, monitors solver progress, and checks the newly generated dataset and its frequency grid.
 
-| | Official `ads-mcp.exe` | This project |
-|---|---|---|
-| Source | obfuscated binary | open, auditable |
-| Philosophy | thin REPL over full API | structured domain tools |
-| Agent needs ADS Python? | yes | no |
-| Workflow guardrails | — | substrate naming, param protection, param tables |
-| Long simulations | — | task id + polling, no blocked tool calls |
-| Session state | in-memory | persisted JSON state machine |
-| Works without GUI | local session, license checkout | headless automation mode, always |
+Momentum support uses `bin/ads-mcp.exe` from the local ADS installation. Prepare and save the layout, substrate, ports, and native EM Setup in ADS before using these tools. See [Momentum workflow and supported scope](docs/momentum.md).
 
-Both are stdio MCP servers; register both side by side if you like — this project's 25 tools cover the design loop, the official `execute_python` covers everything else.
+## Features
 
-## Highlights
-
-- **Headless-first** — the ADS GUI never needs to open; open it only at the end to admire the result (`ads_open_in_gui`).
-- **25 domain tools** — every step of the microstrip design loop is a named tool with a documented schema; see the tool surface below.
-- **Guardrails built in** — substrate auto-naming, string-reference-parameter protection, authoritative component/parameter tables via `ads_browse_components`.
-- **Async simulation** — `ads_run_simulation` returns a task id immediately; poll with `ads_get_sim_status`. No 10-minute tool calls, no killed solves.
-- **Persistent session state** — a JSON state machine (idle → building → simulating → analyzing) survives server restarts and records every task.
-- **Real exports** — Touchstone `.s2p`, matplotlib PNG plots, dataset → pandas.
-- **Topology library** — Butterworth/Chebyshev LC ladders (LPF/HPF/BPF/BSF) synthesized from g-parameters and built headlessly, every cell verified against theory.
-- **Schematic audit** — KiCad-style overlap audit (`ads_audit_schematic`) plus annotation auto-placement (`ads_autolabel`) keep delivered schematics clean: zero body collisions, no dangling wire ends, no text-on-symbol grazes.
+- **Schematic construction:** create workspaces and libraries, then place components, variables, ports, grounds, and wires.
+- **Parameter checks:** automatically name microstrip substrates, protect string reference parameters, and query component and parameter names with `ads_browse_components`.
+- **Asynchronous circuit simulation:** submit a simulation and receive a `task_id`; query status and the resulting dataset path with `ads_get_sim_status`.
+- **Native Momentum simulation:** inspect saved EM Setups, discover ADS GUI sessions, start simulations, and monitor frequency progress and new results.
+- **Persistent task records:** save session and task state as JSON. Momentum monitoring can resume after an MCP server restart; interrupted in-process circuit tasks are marked as errors.
+- **Results and export:** read S-parameter summaries and previews, and export two-port Touchstone `.s2p` files and PNG plots.
+- **Filter examples:** synthesize and build Butterworth and Chebyshev LC ladders from g-parameters, covering low-pass, high-pass, band-pass, and band-stop responses.
+- **Schematic audit:** detect component, text, and wire overlaps and dangling wire endpoints, with automatic annotation placement.
 
 ## Quick Start
 
-Prerequisites: Windows with a licensed Keysight ADS installation — verified end-to-end on ADS 2027 (v6.5.0); uses the `keysight.ads.de` Python API that Keysight has provided since ADS 2025U2, so earlier versions are untested. The native DE engine is cp314-only — the ADS-bundled Python 3.14 is required.
+The project has been validated on Windows with Keysight ADS 2027 (v6.5.0). Other ADS versions have not been validated. Use a valid ADS license and the ADS-bundled Python 3.14 interpreter; the native `keysight.ads.de` engine requires a matching cp314 runtime.
+
+The commands below use the default installation path. Adjust it to match your ADS installation.
 
 ```bat
-git clone https://github.com/<you>/ads-mcp.git
+git clone https://github.com/Lavaxzyh/ads-mcp.git
 cd ads-mcp
 
-:: venv on the ADS-bundled interpreter (reuses the ADS Python packages)
+:: Create a virtual environment with the ADS interpreter and reuse its packages
 "C:\Program Files\Keysight\ADS2027\tools\python\python.exe" -m venv --system-site-packages .venv
 .venv\Scripts\python.exe -m pip install "mcp<2" matplotlib pandas
 ```
 
-### MCP Client Config
+### MCP Client Configuration
 
 ```json
 {
@@ -70,23 +62,25 @@ cd ads-mcp
 }
 ```
 
-Restart your client (Claude Desktop / ZCode / Cursor / …) — the 25 `ads_*` tools appear.
+Replace the repository and ADS paths with local absolute paths, save the configuration, and restart your MCP client, such as Claude Desktop, ZCode, or Cursor, to load the 28 `ads_*` tools.
 
-Try it without an agent:
+### Run the Example Script
+
+You can also run the example script directly, without configuring an AI client:
 
 ```bat
 .venv\Scripts\python.exe demo\step_by_step.py
 ```
 
-This narrates a complete filter build (15 steps), simulates, exports, and opens the result in the ADS GUI.
+The script demonstrates filter construction, simulation, and result export in 15 steps, then opens the generated project in ADS GUI. Check its `WS` and `OUT` paths before running: the script deletes and recreates both example directories.
 
-## Tool Surface
+## Tool Reference (28 Tools)
 
 ### Environment & session (5)
 
 | Tool | What it does |
 |---|---|
-| `ads_check_installed` | Verify the ADS install, `hpeesofsim.exe`, and the headless DE engine. First call of a session. |
+| `ads_check_installed` | Check the ADS installation, `hpeesofsim.exe`, and the ADS DE engine. Recommended at the start of a session. |
 | `ads_create_workspace` | Create an ADS workspace at a path and open it (opens instead of failing if it exists). |
 | `ads_open_workspace` | Open an existing workspace. |
 | `ads_close_workspace` | Close the current workspace. |
@@ -97,58 +91,77 @@ This narrates a complete filter build (15 steps), simulates, exports, and opens 
 | Tool | What it does |
 |---|---|
 | `ads_create_library` | Create a design library inside the open workspace and attach it. |
-| `ads_create_schematic` | Create/open schematic cell `lib:cell` as the current design — subsequent placement tools act on it. |
-| `ads_browse_components` | Enumerate component libraries/cells with authoritative parameter names (microstrip family in `ads_tlines`, controllers/ports in `ads_simulation`, VAR in `ads_datacmps`). Call before placing unfamiliar parts. |
-| `ads_place_component` | Place an instance at (x, y) with optional name/rotation/parameter dict. MSUB is auto-named `MSub1`; string-reference params (`Subst`) are refused to protect netlist quoting. |
+| `ads_create_schematic` | Create or open schematic cell `lib:cell` and set it as the current design for subsequent operations. |
+| `ads_browse_components` | Query component libraries, cells, and parameter names. Microstrip components are in `ads_tlines`, controllers and ports in `ads_simulation`, and VAR in `ads_datacmps`. |
+| `ads_place_component` | Place a component at (x, y), with optional name, rotation, and parameters. MSUB is named `MSub1`; direct assignment to string reference parameters such as `Subst` is rejected to preserve netlist quoting. |
 | `ads_add_wire` | Add a polyline wire, optional net label. |
 | `ads_add_var` | Define a schematic variable in the VAR block; component parameters reference it by name. |
 | `ads_add_term` | Place an S-parameter port (Term, 50 Ω) with its ground; auto-numbers the port from the name. |
 | `ads_add_ground` | Place a ground symbol. |
-| `ads_list_instances` | List everything placed on the current schematic, to confirm the build. |
+| `ads_list_instances` | List all instances in the current schematic. |
 
 ### Simulation (3)
 
 | Tool | What it does |
 |---|---|
-| `ads_generate_netlist` | Save the schematic and return the netlist text — the most reliable mid-build sanity check. |
-| `ads_run_simulation` | Save → netlist → run `hpeesofsim` in a background thread; returns a `task_id` immediately. |
-| `ads_get_sim_status` | Poll a simulation task; on completion carries the dataset (`.ds`) path. |
+| `ads_generate_netlist` | Save the schematic, generate a netlist, and return its text for inspection. |
+| `ads_run_simulation` | Save the schematic, generate a netlist, run `hpeesofsim` in the background, and return a `task_id`. |
+| `ads_get_sim_status` | Poll circuit or Momentum tasks; Momentum includes frequency progress, fresh-output checks and monitoring after server restarts. Completion carries the dataset (`.ds`) path. |
+
+### Native Momentum (3)
+
+| Tool | What it does |
+|---|---|
+| `ads_list_gui_sessions` | Discover running ADS GUI session IDs and workspace paths through the installed Keysight bridge. |
+| `ads_inspect_momentum_setup` | Read a saved native EM Setup, validate its local layout paths and one linear frequency sweep, and report an existing run reservation. |
+| `ads_run_momentum` | Validate the selected GUI workspace and setup link, launch once, and return a task ID. Poll with `ads_get_sim_status`; read/export/plot the dataset with the existing result tools. |
+
+Prepare and save the layout, substrate, ports, and native EM Setup, then open the workspace in ADS GUI. If this MCP server has a workspace open, close it with `ads_close_workspace` before dispatch. This release supports native calculation type `5` and one linear sweep, as validated on ADS 2027. Automated EM layout, substrate, and setup creation, and RFPro/FEM execution, are not yet supported. See [Momentum workflow](docs/momentum.md) for usage and recovery steps.
 
 ### Optimization (2)
 
 | Tool | What it does |
 |---|---|
-| `ads_add_goal` | Add an optimization goal: expression (e.g. `dB(S(1,2))`), keep-above (`min`) or keep-below (`max`) bound, evaluation band, weight. |
-| `ads_add_optim` | Place the optimization controller (gradient/hpVMO, random, quasinewton, …); auto-collects every variable that has an opt range and every goal. |
-`ads_add_var` gains optional `opt_min`/`opt_max` — variables with a range become optimization variables.
+| `ads_add_goal` | Add an optimization goal with an expression, lower or upper bound, evaluation band, and weight. |
+| `ads_add_optim` | Add an optimization controller and collect variables with optimization ranges and the defined goals. |
 
-
+Use the `opt_min` and `opt_max` parameters of `ads_add_var` to set a variable's optimization range.
 
 ### Schematic audit (2)
 
 | Tool | What it does |
 |---|---|
-| `ads_audit_schematic` | KiCad-style overlap audit of a saved or current schematic: pairwise instance bounding boxes (body vs annotation text) plus wire segments, graded by severity (body-body / body-text / text-text / text-wire / body-wire) with connectivity-aware exemptions and dangling-wire-endpoint (ERC-style) detection. |
-| `ads_autolabel` | Auto-places instance annotations to clear text-level collisions: for each clash, tries candidate sides (right/left/up/down, least-displacement first) and moves only the annotation — never the component. |
+| `ads_audit_schematic` | Check a saved or current design for component, text, and wire overlaps and dangling wire endpoints. Classify findings by collision type and severity, with connectivity-aware exemptions. |
+| `ads_autolabel` | Adjust instance annotations to reduce overlaps, preferring candidate positions with smaller displacement while preserving component positions. |
 
 ### Results & export (4)
 
 | Tool | What it does |
 |---|---|
-| `ads_get_results` | Read a dataset: per-S-parameter dB min/max/band-edge, first −3 dB crossing (cutoff hint), downsampled magnitude/phase preview. |
-| `ads_export_touchstone` | Export S-parameters as a standard `.s2p` (HZ S RI R 50). |
+| `ads_get_results` | Read a dataset and return S-parameter dB extrema, band-edge values, the first frequency below −3 dB, and downsampled magnitude and phase previews. |
+| `ads_export_touchstone` | Export a two-port Touchstone `.s2p` file in `HZ S RI R 50` format. |
 | `ads_plot_sparams` | Plot \|S\| dB vs frequency (selectable columns) to a PNG. |
 | `ads_open_in_gui` | Open the current workspace in the ADS GUI (detached process, survives server restarts). |
 
-Current MCP registration: **25 tools**.
+Current MCP registration: **28 tools** (25 existing + 3 Momentum tools).
+
+## Momentum Example
+
+Open the prepared workspace in ADS GUI, discover the session ID with `ads_list_gui_sessions`, then run:
+
+```bat
+.venv\Scripts\python.exe demo\run_momentum.py --workspace C:/ADS/lpf_wrk --setup-file C:/ADS/lpf_wrk/si_lpf_lib/lpf5o/em%Setup/emStateFile.xml --session-id 12345
+```
+
+Replace the paths and session ID with actual values. The example uses this project's MCP tools to start a simulation, check the new dataset, read results, and export PNG and Touchstone files. Use `--state-file` or the `ADS_MCP_STATE_FILE` environment variable to select a task-state JSON file. Keep the same file and specify the original task ID with `--resume-task` to continue monitoring after a server restart.
 
 ## Example Workflow
 
-Design a 5-element step-impedance microstrip low-pass filter on FR4, ~1 GHz cutoff:
+The following call sequence outlines a six-section stepped-impedance microstrip low-pass filter on FR4, with a target cutoff near 1 GHz. Some calls are omitted for brevity. See [`demo/step_by_step.py`](demo/step_by_step.py) for the complete executable example.
 
 ```text
 ads_check_installed()
-ads_create_workspace(path="~/ads_mcp_demo/lpf_wrk")
+ads_create_workspace(path="C:/ADS/ads_mcp_demo/lpf_wrk")
 ads_create_library(name="si_lpf_lib")
 ads_create_schematic(lib="si_lpf_lib", cell="lpf5")
 ads_add_var(name="Wh", value="0.2 mm")          # high-Z line width  (~series L)
@@ -172,53 +185,60 @@ ads_run_simulation()          -> task_id                # non-blocking
 ads_get_sim_status(task_id)   -> dataset path
 ads_get_results()             -> S21 passband −0.08 dB, −3 dB cutoff 1.025 GHz,
                                  −38 dB rejection @ 6 GHz
-ads_plot_sparams(columns=["S[1,1]", "S[1,2]"])
+ads_plot_sparams(columns=["S[1,1]", "S[2,1]"])
 ads_export_touchstone()
-ads_open_in_gui()                                       # admire the schematic
+ads_open_in_gui()                                       # inspect the schematic in ADS
 ```
 
-The full narrated version of exactly this build lives in [`demo/step_by_step.py`](demo/step_by_step.py).
+The response values shown are from earlier circuit simulation acceptance checks. Actual results depend on design parameters and simulation settings. This example's circuit sweep is separate from the 396-point Momentum validation below.
 
-## Traffic
+## Repository Traffic
 
 ![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png)
 
-Clone/view history is collected daily by [ghtraf](https://pypi.org/project/github-traffic-tracker/) and stored in a public Gist — permanent history beyond GitHub's 14-day traffic window. The live badges at the top of this README update from the same source.
+Clone and view statistics are collected daily by [ghtraf](https://pypi.org/project/github-traffic-tracker/) and saved to a public Gist for historical tracking. The badges at the top of this README use the same data source.
 
 ## Requirements
 
-- Windows with a licensed Keysight ADS installation — verified end-to-end on ADS 2027 (v6.5.0); uses the `keysight.ads.de` Python API provided by Keysight since ADS 2025U2; earlier versions untested
-- ADS-bundled Python 3.14 (for the `keysight.ads.de` native engine); wheels for result reading (`keysight.ads.dataset` cp310–cp314) ship in the ADS wheelhouse
-- An MCP client (Claude Desktop, ZCode, Cursor, or any stdio-MCP host)
+- Windows and a Keysight ADS installation with a valid license. Validated on ADS 2027 (v6.5.0); other versions have not been validated.
+- ADS-bundled Python 3.14 and the ADS Python packages, including `keysight.ads.de` and `keysight.ads.dataset`.
+- For MCP access, a client supporting stdio transport, such as Claude Desktop, ZCode, or Cursor.
+- For Momentum: the installed Keysight `bin/ads-mcp.exe` bridge, an ADS GUI
+  session with the target workspace open, and a saved native EM Setup.
 
-## Verification
+## Validation
 
-End-to-end acceptance (MCP-level, `tests/test_full_flow.py`) on ADS 2027:
+Circuit/topology acceptance (`tests/test_full_flow.py`) and v0.3.0 Momentum
+validation (`demo/run_momentum.py`) on ADS 2027:
 
-- ✅ 25 tools registered and callable over stdio
-- ✅ conversational build: 13 instances placed, netlist verified, simulation submitted/polled via task id
-- ✅ SI-LPF response: passband −0.08 dB, −3 dB cutoff **1.025 GHz** (design target 1 GHz), stopband −38 dB @ 6 GHz
-- ✅ Touchstone + PNG exports, GUI hand-off
-- ✅ LC topology library: 8 filters (LPF/HPF/BPF/BSF × Chebyshev/Butterworth) built and verified — Chebyshev LPF in-band ripple 0.10 dB, Butterworth cutoff 1.00 GHz, 0 schematic collisions per cell
+- 28 tools registered over stdio, with tool definitions checked.
+- Circuit construction: 13 instances placed, netlist checked, and simulation submitted and polled by task ID.
+- Circuit example response: approximately −0.08 dB in the passband, first sampled frequency below −3 dB at **1.025 GHz** (1 GHz design target), and approximately −38 dB at 6 GHz.
+- Result delivery: Touchstone and PNG export, and opening the project in ADS GUI.
+- LC filter examples: eight combinations of Butterworth and Chebyshev responses with four filter types. Example results include approximately 0.10 dB Chebyshev low-pass ripple and a 1.00 GHz Butterworth cutoff, with no component body collisions reported by the audit.
+- Unit and regression checks: 44 passed, covering state recovery, duplicate dispatch prevention, result capture, and export behavior.
+- Native Momentum: 0.05–4.00 GHz, 396 points, frequency-grid verification,
+  server-restart monitoring, and result exports.
 
 ## Roadmap
 
 - [ ] Parameter sweeps & MeasEqn tools
 - [x] Optimizer hooks (geometry → spec closed-loop tuning)
 - [x] Schematic audit & annotation auto-placement (KiCad eeschema-inspired)
-- [ ] EM (Momentum) flow
+- [x] Native Momentum execution with an existing saved EM Setup
+- [ ] Automated EM layout/substrate/setup creation
 - [ ] Multi-session registry (attach/audit concurrent ADS processes)
 - [ ] API doc search tool (complements the official server's `search_docs`)
 - [ ] Linux support where ADS supports it
 
 ## Community
 
-Issues and PRs welcome — the codebase is small on purpose: three modules, no framework. If you build a design flow on top (synthesis, PCB co-sim, load-pull…), a demo script contribution is the best PR.
+Report problems through Issues or contribute improvements through Pull Requests. The implementation has four core Python modules for MCP tools, the ADS engine, Momentum, and task state. Contributions of example scripts for circuit synthesis, PCB co-simulation, load-pull analysis, or other workflows are also welcome.
 
 ## Acknowledgments
 
-The overlap audit (`ads_audit_schematic`) and label auto-placement (`ads_autolabel`) follow the approach of KiCad's eeschema field auto-placement (`eeschema/autoplace_fields.cpp`): bounding-box collision detection with severity-graded candidate placement. The algorithm idea was referenced, not copied — no KiCad code is included, and this project remains MIT. KiCad is © its contributors, licensed under GPL-3.0.
+The schematic audit (`ads_audit_schematic`) and annotation placement (`ads_autolabel`) draw on the algorithmic approach of KiCad eeschema field placement (`eeschema/autoplace_fields.cpp`), including bounding-box collision detection and candidate position ranking. This project contains no KiCad source code and uses the MIT license. KiCad is copyright its contributors and licensed under GPL-3.0.
 
 ## License
 
-[MIT](LICENSE) — Keysight and ADS are trademarks of Keysight Technologies; this project only calls the public Python API shipped with your licensed installation.
+This project uses the [MIT license](LICENSE). Keysight and ADS are trademarks of Keysight Technologies. At runtime, the project uses the Python/AEL interfaces and local bridge from a licensed ADS installation. Use of ADS software and its components is subject to the applicable Keysight license terms.

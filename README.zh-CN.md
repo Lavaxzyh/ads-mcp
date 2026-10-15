@@ -2,7 +2,7 @@
 
 ![Clones](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones.json) ![Views](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/views.json) ![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/installs.json)
 
-**开源的 headless 优先 Keysight ADS MCP 服务器** —— 不打开 ADS 图形界面，让 AI 代理完成射频微波电路的原理图搭建 → 网表 → 仿真 → S 参数读取全流程。
+**面向 Keysight ADS 的开源 MCP Server**，提供射频与微波电路的原理图搭建、电路仿真、Momentum 仿真及 S 参数处理工具。
 
 [English](README.md) · 简体中文
 
@@ -10,48 +10,40 @@
 ![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)
 ![ADS](https://img.shields.io/badge/Tested_on_Keysight_ADS_2027-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tools](https://img.shields.io/badge/工具数-25-4c1)
+![Tools](https://img.shields.io/badge/工具数-28-4c1)
 
-> 与 Keysight Technologies 无关联、未获其认可。需要你自有的正版 ADS 许可证——本仓库不含任何 Keysight 代码或二进制。
+> 本项目为第三方开源项目，非 Keysight 官方产品。使用前需自行安装 Keysight ADS 并具备有效许可证。本仓库不分发 ADS 软件及其专有组件。
 
-## 为什么做这个
+## 项目概述
 
-ADS 2027 自带官方 MCP 服务器(`bin\ads-mcp.exe`):闭源、定位是**薄通用 REPL**——一个 `execute_python` 工具暴露整套 ADS Python API。能力很强，但要求代理已经会写 ADS Python，每一步都得自己编码。
+**ads-mcp v0.3.0** 将 ADS 中的设计与仿真操作封装为 **28 个 MCP 工具**，为每个工具提供明确的参数定义，并记录会话与仿真任务状态。
 
-**ads-mcp 反其道而行**:把设计工作流本身做成 **25 个具名、带 schema 文档的工具**，并内置防呆护栏。从未见过 ADS Python API 的代理，用对话就能跑通"原理图 → 网表 → hpeesofsim → S 参数"全闭环。
+电路仿真流程覆盖原理图搭建、网表生成、`hpeesofsim` 求解和 S 参数处理。Momentum 流程通过指定的 ADS GUI 会话运行**已有且已保存的原生 EM Setup**，监控求解进度，检查新生成的数据集及其频率网格。
 
-| | 官方 `ads-mcp.exe` | 本项目 |
-|---|---|---|
-| 源码 | 混淆二进制 | 开源可审计 |
-| 哲学 | 薄 REPL，暴露全量 API | 结构化领域工具 |
-| 代理需要会 ADS Python? | 需要 | 不需要 |
-| 工作流护栏 | — | 基板命名/参数保护/参数名表 |
-| 长仿真 | — | task id + 轮询，不阻塞工具调用 |
-| 会话状态 | 内存态 | JSON 状态机落盘，重启可恢复 |
-| 脱离 GUI | 本地会话需拉许可证 | headless automation 模式，始终无界面 |
+Momentum 功能调用本机 ADS 安装目录中的 `bin/ads-mcp.exe`。使用前需在 ADS 中准备并保存版图、衬底、端口和原生 EM Setup，详见 [Momentum 工作流与支持范围](docs/momentum.md)。
 
-两者都是 stdio MCP 服务器，可并列注册:本项目 25 个工具覆盖设计闭环，官方 `execute_python` 兜底其余操作。
+## 主要功能
 
-## 亮点
-
-- **headless 优先** —— 全程无需打开 ADS 界面;最后用 `ads_open_in_gui` 打开欣赏成果即可。
-- **25 个领域工具** —— 微带设计闭环每一步都是具名工具，schema 即文档，见下方工具面。
-- **护栏内置** —— 基板自动命名、字符串引用参数保护、`ads_browse_components` 提供权威元件/参数名表。
-- **异步仿真** —— `ads_run_simulation` 立即返回 task id，`ads_get_sim_status` 轮询;长仿真不再卡死工具调用。
-- **会话状态落盘** —— JSON 状态机(idle → building → simulating → analyzing)，服务器重启可恢复、任务可追溯。
-- **真实导出** —— Touchstone `.s2p`、matplotlib PNG 曲线、数据集 → pandas。
-- **拓扑库** —— Butterworth/Chebyshev LC 梯形(LPF/HPF/BPF/BSF)由 g 参数综合、headless 搭建,每格对照理论验证。
-- **原理图审计** —— KiCad 式重叠审计(`ads_audit_schematic`)+ 标注自动避让(`ads_autolabel`):交付原理图零本体碰撞、无悬空线头、无文字压符号。
+- **原理图搭建**：创建工作区与设计库，放置元件、变量、端口、接地符号和导线。
+- **参数检查**：自动命名微带衬底，保护字符串引用参数，并通过 `ads_browse_components` 查询元件及参数名称。
+- **异步电路仿真**：提交仿真后返回 `task_id`，通过 `ads_get_sim_status` 查询状态和数据集路径。
+- **原生 Momentum 仿真**：检查已保存的 EM Setup、发现 ADS GUI 会话、启动仿真，并监控频点进度和新结果。
+- **任务状态持久化**：将会话与任务记录保存为 JSON。Momentum 任务可在 MCP 服务重启后继续监控；进程内电路任务中断后会标记为错误。
+- **结果处理与导出**：读取 S 参数摘要和预览，导出双端口 Touchstone `.s2p` 文件及 PNG 曲线。
+- **滤波器示例**：提供基于 g 参数的 Butterworth、Chebyshev LC 梯形滤波器综合与搭建示例，覆盖低通、高通、带通和带阻响应。
+- **原理图审计**：检测元件、文字与导线重叠及悬空线端点，并支持文字标注自动避让。
 
 ## 快速开始
 
-前提:Windows 及已授权安装的 Keysight ADS——已在 ADS 2027(v6.5.0)上完整验证;所用 Python API 基于 Keysight 自 2025U2 起提供的 `keysight.ads.de`，更早版本未经测试。原生 DE 引擎仅支持 cp314，必须用 ADS 自带 Python 3.14。
+本项目已在 Windows 与 Keysight ADS 2027（v6.5.0）环境中验证，其他 ADS 版本尚未验证。请使用有效的 ADS 许可证和 ADS 自带的 Python 3.14；所用 `keysight.ads.de` 原生引擎需要匹配 cp314。
+
+以下命令以默认安装路径为例，请根据本机 ADS 安装位置调整路径。
 
 ```bat
-git clone https://github.com/<you>/ads-mcp.git
+git clone https://github.com/Lavaxzyh/ads-mcp.git
 cd ads-mcp
 
-:: 用 ADS 自带解释器建 venv(复用其 Python 包)
+:: 使用 ADS 自带的 Python 创建虚拟环境，并复用其 Python 包
 "C:\Program Files\Keysight\ADS2027\tools\python\python.exe" -m venv --system-site-packages .venv
 .venv\Scripts\python.exe -m pip install "mcp<2" matplotlib pandas
 ```
@@ -70,77 +62,106 @@ cd ads-mcp
 }
 ```
 
-重启客户端(Claude Desktop / ZCode / Cursor / …)，25 个 `ads_*` 工具即出现。
+将配置中的仓库路径和 ADS 安装路径替换为本机绝对路径，保存后重启 MCP 客户端（如 Claude Desktop、ZCode 或 Cursor），即可加载 28 个 `ads_*` 工具。
 
-不用代理也可以直接体验:
+### 运行示例脚本
+
+也可直接运行示例脚本，无需配置 AI 客户端：
 
 ```bat
 .venv\Scripts\python.exe demo\step_by_step.py
 ```
 
-该脚本分 15 步旁白式搭完一个滤波器、仿真、导出，并在 ADS GUI 中打开结果。
+该脚本分 15 步演示滤波器搭建、仿真和结果导出，并在 ADS GUI 中打开生成的工程。运行前请检查脚本中的 `WS`、`OUT` 路径；脚本会删除并重建这两个示例目录。
 
-## 工具面(25 个)
+## 工具列表（28 个）
 
-### 环境与会话(5)
+### 环境与会话（5 个）
 
 | 工具 | 功能 |
 |---|---|
-| `ads_check_installed` | 自检 ADS 安装、`hpeesofsim.exe`、headless DE 引擎;会话第一步。 |
-| `ads_create_workspace` | 在指定路径创建工作区并打开(已存在则直接打开)。 |
+| `ads_check_installed` | 检查 ADS 安装、`hpeesofsim.exe` 和 ADS DE 引擎，建议在会话开始时调用。 |
+| `ads_create_workspace` | 在指定路径创建并打开工作区；若工作区已存在，则直接打开。 |
 | `ads_open_workspace` | 打开已有工作区。 |
 | `ads_close_workspace` | 关闭当前工作区。 |
-| `ads_session_status` | 会话快照:状态机阶段、打开的工作区、当前原理图、历史仿真任务。 |
+| `ads_session_status` | 查询会话状态、当前工作区、当前原理图及历史仿真任务。 |
 
-### 原理图搭建(9)
+### 原理图搭建（9 个）
 
 | 工具 | 功能 |
 |---|---|
 | `ads_create_library` | 在工作区内创建设计库并挂载。 |
-| `ads_create_schematic` | 创建/打开原理图 `库:单元` 并设为当前设计，后续放置类工具作用于它。 |
-| `ads_browse_components` | 枚举组件库/元件及权威参数名(微带族在 `ads_tlines`，控制器/端口在 `ads_simulation`，VAR 在 `ads_datacmps`);放不熟悉的元件前先查。 |
-| `ads_place_component` | 在坐标放置实例，可设名称/旋转/参数字典。MSUB 自动命名 `MSub1`;字符串引用参数(`Subst`)拒绝赋值以保护网表引号。 |
+| `ads_create_schematic` | 创建或打开原理图 `库:单元`，并将其设为后续操作的当前设计。 |
+| `ads_browse_components` | 查询元件库、元件及参数名称。微带元件位于 `ads_tlines`，控制器和端口位于 `ads_simulation`，VAR 位于 `ads_datacmps`。 |
+| `ads_place_component` | 按坐标放置元件，可指定名称、旋转角度和参数。MSUB 自动命名为 `MSub1`；`Subst` 等字符串引用参数不接受直接赋值，以保护网表引用格式。 |
 | `ads_add_wire` | 添加折线连线，可带网络标号。 |
 | `ads_add_var` | 在 VAR 块定义原理图变量，元件参数可按名引用。 |
-| `ads_add_term` | 放置 S 参数端口(Term，50 Ω)并自动配地;按名称自动编号端口。 |
+| `ads_add_term` | 放置 50 Ω S 参数端口及接地符号，并根据名称设置端口编号。 |
 | `ads_add_ground` | 放置地符号。 |
-| `ads_list_instances` | 列出当前原理图全部实例，确认搭建结果。 |
+| `ads_list_instances` | 列出当前原理图中的全部实例。 |
 
-### 仿真(3)
-
-| 工具 | 功能 |
-|---|---|
-| `ads_generate_netlist` | 保存原理图并返回网表文本——搭建中途最可靠的自检手段。 |
-| `ads_run_simulation` | 保存 → 网表 → 后台线程运行 `hpeesofsim`;立即返回 `task_id`。 |
-| `ads_get_sim_status` | 轮询仿真任务;完成后携带数据集(`.ds`)路径。 |
-
-
-
-### 原理图审计(2)
+### 仿真（3 个）
 
 | 工具 | 功能 |
 |---|---|
-| `ads_audit_schematic` | KiCad 式原理图重叠审计:对已保存或当前设计两两比对实例包围盒(本体/文字标注)并纳入导线,按严重度分级(body-body / body-text / text-text / text-wire / body-wire),含连通性豁免与悬空线端点(ERC 式)检测 |
-| `ads_autolabel` | 标注自动避让:对文字级碰撞按候选方位(右/左/上/下,小位移优先)只挪标注不动元件 |
+| `ads_generate_netlist` | 保存原理图并生成网表，返回网表文本供检查。 |
+| `ads_run_simulation` | 保存原理图、生成网表，在后台运行 `hpeesofsim`，并返回 `task_id`。 |
+| `ads_get_sim_status` | 查询电路或 Momentum 仿真任务状态，完成后返回数据集（`.ds`）路径。Momentum 任务还提供频点进度、新结果检查和服务重启后的继续监控。 |
 
-### 结果与导出(4)
+### 原生 Momentum（3 个）
 
 | 工具 | 功能 |
 |---|---|
-| `ads_get_results` | 读数据集:各 S 参数 dB 极值/带边值、首个 −3 dB 穿越(截止频率提示)、降采样幅度/相位预览。 |
-| `ads_export_touchstone` | 导出标准 `.s2p`(HZ S RI R 50)。 |
-| `ads_plot_sparams` | 绘制 \|S\| dB–频率曲线(可选列)输出 PNG。 |
-| `ads_open_in_gui` | 在 ADS GUI 中打开当前工作区(脱离进程树，服务器重启不影响)。 |
+| `ads_list_gui_sessions` | 通过本机 Keysight 桥接程序发现 ADS GUI 会话 ID 和工作区路径。 |
+| `ads_inspect_momentum_setup` | 只读检查原生 EM Setup、本地版图路径、单段线性扫频和已有运行锁。 |
+| `ads_run_momentum` | 核对指定 GUI 会话的工作区及 EM Setup 关联后启动仿真，返回 `task_id`。后续通过状态与结果工具查询、读取、绘图和导出。 |
 
-当前注册工具数:**25**。
+使用前需准备并保存版图、衬底、端口和原生 EM Setup，并在 ADS GUI 中打开相应工作区。如果本 MCP 服务器已打开工作区，需先调用 `ads_close_workspace` 释放。本版支持 ADS 2027 上已验证的原生计算类型 `5` 和单段线性扫频。自动创建 EM 版图、衬底和 Setup，以及 RFPro/FEM 执行尚未支持。操作与恢复方法见 [Momentum 工作流](docs/momentum.md)。
+
+### 优化（2 个）
+
+| 工具 | 功能 |
+|---|---|
+| `ads_add_goal` | 添加优化目标，指定表达式、上下限类型、约束值、评估频带和权重。 |
+| `ads_add_optim` | 添加优化控制器，收集已设置优化范围的变量及优化目标。 |
+
+`ads_add_var` 的 `opt_min`、`opt_max` 参数用于设置变量的优化范围。
+
+### 原理图审计（2 个）
+
+| 工具 | 功能 |
+|---|---|
+| `ads_audit_schematic` | 检查已保存或当前设计中的元件、文字和导线重叠，按碰撞类型与严重程度分类，并检测悬空线端点；支持连通性相关豁免。 |
+| `ads_autolabel` | 调整实例文字标注的位置以减少重叠，优先选择位移较小的候选位置，保持元件位置不变。 |
+
+### 结果与导出（4 个）
+
+| 工具 | 功能 |
+|---|---|
+| `ads_get_results` | 读取数据集，返回各 S 参数的 dB 极值、频带端点值、首个低于 −3 dB 的频点，以及降采样后的幅度与相位预览。 |
+| `ads_export_touchstone` | 导出双端口 Touchstone `.s2p` 文件，格式为 `HZ S RI R 50`。 |
+| `ads_plot_sparams` | 将所选 S 参数的幅度（dB）随频率变化曲线保存为 PNG。 |
+| `ads_open_in_gui` | 启动 ADS GUI 并打开当前工作区，GUI 进程独立于 MCP 服务运行。 |
+
+当前注册工具数：**28**（原有 25 个 + Momentum 新增 3 个）。
+
+## Momentum 使用示例
+
+先在 ADS GUI 中打开准备好的工程，用 `ads_list_gui_sessions` 获取会话 ID，然后运行：
+
+```bat
+.venv\Scripts\python.exe demo\run_momentum.py --workspace C:/ADS/lpf_wrk --setup-file C:/ADS/lpf_wrk/si_lpf_lib/lpf5o/em%Setup/emStateFile.xml --session-id 12345
+```
+
+请将工程路径和会话 ID 替换为实际值。示例通过本项目的 MCP 工具启动仿真，待新数据集生成并通过检查后读取结果，导出 PNG 和 Touchstone。可通过 `--state-file` 参数或 `ADS_MCP_STATE_FILE` 环境变量指定任务状态 JSON 文件；保留同一文件，并使用 `--resume-task` 指定原任务 ID，可在服务重启后继续监控。
 
 ## 示例工作流
 
-在 FR4 上设计 5 阶阶跃阻抗微带低通滤波器，目标截止 ~1 GHz:
+以下为六段微带线构成的阶跃阻抗低通滤波器调用示意，采用 FR4 衬底，目标截止频率约为 1 GHz。此处省略了部分调用，仅用于说明工具顺序；完整代码见 [`demo/step_by_step.py`](demo/step_by_step.py)。
 
 ```text
 ads_check_installed()
-ads_create_workspace(path="~/ads_mcp_demo/lpf_wrk")
+ads_create_workspace(path="C:/ADS/ads_mcp_demo/lpf_wrk")
 ads_create_library(name="si_lpf_lib")
 ads_create_schematic(lib="si_lpf_lib", cell="lpf5")
 ads_add_var(name="Wh", value="0.2 mm")          # 高阻抗线宽(~串联电感)
@@ -164,53 +185,60 @@ ads_run_simulation()          -> task_id                # 非阻塞
 ads_get_sim_status(task_id)   -> 数据集路径
 ads_get_results()             -> S21 通带 −0.08 dB,−3 dB 截止 1.025 GHz,
                                  6 GHz 处抑制 −38 dB
-ads_plot_sparams(columns=["S[1,1]", "S[1,2]"])
+ads_plot_sparams(columns=["S[1,1]", "S[2,1]"])
 ads_export_touchstone()
-ads_open_in_gui()                                       # 打开 GUI 欣赏
+ads_open_in_gui()                                       # 在 ADS 中查看原理图
 ```
 
-这套构建的完整旁白版在 [`demo/step_by_step.py`](demo/step_by_step.py)。
+示例中的响应数值来自此前的电路仿真验收，实际结果取决于设计参数与仿真设置。此示例的电路扫频设置独立于下文 Momentum 的 396 点验收设置。
 
-## 流量
+## 仓库访问统计
 
 ![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png)
 
-克隆/浏览历史由 [ghtraf](https://pypi.org/project/github-traffic-tracker/) 每日采集并存入公开 Gist——永久历史，突破 GitHub 仅保留 14 天流量数据的限制。README 顶部的实时徽章同源更新。
+克隆与浏览数据由 [ghtraf](https://pypi.org/project/github-traffic-tracker/) 每日采集并保存至公开 Gist，用于保留长期历史。README 顶部徽章使用同一数据源。
 
 ## 环境要求
 
-- Windows 及已授权安装的 Keysight ADS——已在 ADS 2027(v6.5.0)上完整验证;所用 Python API 基于 Keysight 自 2025U2 起提供的 `keysight.ads.de`，更早版本未经测试
-- ADS 自带 Python 3.14(`keysight.ads.de` 原生引擎);结果读取包(`keysight.ads.dataset`，cp310–cp314)随 ADS wheelhouse 提供
-- 任意 stdio MCP 客户端(Claude Desktop、ZCode、Cursor 等)
+- Windows 与具有有效许可证的 Keysight ADS。本项目已在 ADS 2027（v6.5.0）上验证，其他版本尚未验证。
+- ADS 自带 Python 3.14，以及 `keysight.ads.de`、`keysight.ads.dataset` 等 ADS Python 包。
+- 通过 MCP 调用时，需使用支持 stdio 传输的 MCP 客户端，如 Claude Desktop、ZCode 或 Cursor。
+- Momentum 需要本机 Keysight `bin/ads-mcp.exe` 桥接程序、已打开目标工程的
+  ADS GUI 会话，以及已保存的原生 EM Setup。
 
-## 验证
+## 验证记录
 
-MCP 层端到端验收(`tests/test_full_flow.py`，ADS 2027):
+ADS 2027 上的电路/拓扑验收（`tests/test_full_flow.py`）及 v0.3.0 Momentum
+验收（`demo/run_momentum.py`）：
 
-- ✅ 25 个工具经 stdio 注册并可调用
-- ✅ 对话式搭建:放置 13 个实例、网表核对、task id 提交/轮询仿真
-- ✅ SI-LPF 响应:通带 −0.08 dB，−3 dB 截止 **1.025 GHz**(设计目标 1 GHz)，6 GHz 处阻带 −38 dB
-- ✅ Touchstone + PNG 导出、GUI 交接
-- ✅ LC 拓扑库:8 个滤波器(LPF/HPF/BPF/BSF × Chebyshev/Butterworth)搭建并验证——Chebyshev LPF 带内纹波 0.10 dB、Butterworth 截止精确 1.00 GHz,每格原理图 0 碰撞
+- 28 个工具通过 stdio 注册，并检查工具定义。
+- 电路搭建：放置 13 个实例、检查网表，并通过任务 ID 提交和查询仿真。
+- 电路示例结果：通带约 −0.08 dB，首个低于 −3 dB 的频点为 **1.025 GHz**（设计目标 1 GHz），6 GHz 处响应约 −38 dB。
+- 结果交付：Touchstone 与 PNG 导出，以及在 ADS GUI 中打开工程。
+- LC 滤波器示例：验证 Butterworth、Chebyshev 两类响应与四种滤波类型的 8 种组合。示例结果包括 Chebyshev 低通带内纹波约 0.10 dB、Butterworth 截止频率约 1.00 GHz，审计未报告元件本体碰撞。
+- 单元与回归检查：44 项通过，覆盖状态恢复、重复启动防护、结果归档和导出等行为。
+- 原生 Momentum：0.05–4.00 GHz、396 点，频点网格核对、服务重启后继续
+  监控及结果导出。
 
 ## 路线图
 
 - [ ] 参数扫描与 MeasEqn 工具
-- [x] 优化器对接(几何 → 指标闭环调优)
-- [x] 原理图审计与标注自动避让(参考 KiCad eeschema)
-- [ ] EM(Momentum)流程
-- [ ] 多会话注册表(并发 ADS 进程的挂接与审计)
-- [ ] API 文档检索工具(与官方服务器的 `search_docs` 互补)
+- [x] 优化器对接（设计参数与响应指标优化）
+- [x] 原理图审计与标注自动避让（参考 KiCad eeschema）
+- [x] 已有原生 EM Setup 的 Momentum 执行流程
+- [ ] EM 版图、衬底和 Setup 自动创建
+- [ ] 多会话注册表（并发 ADS 进程的连接与审计）
+- [ ] API 文档检索工具（与官方服务器的 `search_docs` 互补）
 - [ ] ADS 支持范围内的 Linux 支持
 
 ## 社区
 
-欢迎 Issue 与 PR——代码库刻意保持很小:三个模块，无框架。如果你在上面搭出了设计流程(综合、PCB 协仿真、load-pull…)，一个 demo 脚本就是最好的 PR。
+欢迎通过 Issue 反馈问题，或通过 Pull Request 提交改进。核心实现由 MCP 工具、ADS 引擎、Momentum 和任务状态四个 Python 模块组成。基于本项目实现的电路综合、PCB 协同仿真或负载牵引等流程，也欢迎以示例脚本的形式贡献。
 
 ## 致谢
 
-重叠审计(`ads_audit_schematic`)与标注自动避让(`ads_autolabel`)的算法思路参考自 KiCad eeschema 的字段自动摆放(`eeschema/autoplace_fields.cpp`):包围盒碰撞检测 + 候选方位严重度分级。本项目仅参考算法思路、未复制任何代码，保持 MIT 许可。KiCad © 其贡献者，采用 GPL-3.0 许可。
+原理图审计（`ads_audit_schematic`）与标注自动避让（`ads_autolabel`）参考了 KiCad eeschema 字段自动放置（`eeschema/autoplace_fields.cpp`）的算法思路，包括包围盒碰撞检测与候选位置分级。本项目未包含 KiCad 源代码，采用 MIT 许可证。KiCad 的版权归其贡献者所有，采用 GPL-3.0 许可证。
 
 ## 许可证
 
-[MIT](LICENSE) —— Keysight 与 ADS 为 Keysight Technologies 商标;本项目仅调用你已授权安装所附带的公开 Python API。
+本项目采用 [MIT 许可证](LICENSE)。Keysight 与 ADS 为 Keysight Technologies 的商标。运行时使用本机已授权 ADS 安装提供的 Python/AEL 接口及本地桥接程序；ADS 软件及其组件的使用受 Keysight 相应许可条款约束。

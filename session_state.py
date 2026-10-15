@@ -8,6 +8,7 @@ poll instead of blocking the tool call.
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 import tempfile
@@ -56,7 +57,26 @@ class SessionState:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
+                tasks = data.get("tasks", {})
+                data["tasks"] = {
+                    str(tid): task for tid, task in tasks.items()
+                    if isinstance(task, dict) and task.get("status") in {"running", "done", "error"}
+                } if isinstance(tasks, dict) else {}
+                phase = data.get("state", "idle")
+                if not isinstance(phase, str) or phase not in VALID_STATES:
+                    data["state"] = "idle"
                 self._data.update(data)
+                # External Momentum jobs live in ADS and can still be polled.
+                # In-process circuit workers cannot survive a server restart.
+                interrupted = False
+                for task in self._data["tasks"].values():
+                    if task.get("status") == "running" and task.get("kind") != "momentum":
+                        task.update(status="error", error="MCP server restarted; in-process task was interrupted")
+                        interrupted = True
+                if interrupted and not any(t.get("status") == "running" for t in self._data["tasks"].values()):
+                    self._data["state"] = "error"
+                if interrupted:
+                    self._save()
         except (OSError, json.JSONDecodeError):
             # corrupt state file: keep defaults, never block startup
             pass
@@ -108,10 +128,44 @@ class SessionState:
             self._save()
 
     # ---- tasks ----
+    def create_external_task(self, kind: str, monitor: dict[str, Any]) -> str:
+        """Persist a solver monitor before dispatch; polling survives restarts."""
+        with self._lock:
+            if any(t.get("status") == "running" for t in self._data["tasks"].values()):
+                raise StateError("another simulation task is running; poll it before starting a new one")
+            task_id = f"{kind}_{uuid.uuid4().hex[:8]}"
+            self._data["tasks"][task_id] = {
+                "kind": kind, "status": "running", "monitor": copy.deepcopy(monitor),
+                "submitted_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "finished_at": None, "result": None, "error": None, "progress": {},
+            }
+            self._data["state"] = "simulating"
+            self._save()
+            return task_id
+
+    def update_external_task(self, task_id: str, *, status: str = "running",
+                             progress: dict | None = None, result: dict | None = None,
+                             error: str | None = None) -> None:
+        with self._lock:
+            task = self._data["tasks"][task_id]
+            if task["status"] != "running":
+                return
+            if status not in {"running", "done", "error"}:
+                raise StateError(f"invalid task status: {status}")
+            task["status"] = status
+            if progress is not None:
+                task["progress"] = copy.deepcopy(progress)
+            if status != "running":
+                task.update(result=result, error=error, finished_at=time.strftime("%Y-%m-%dT%H:%M:%S"))
+                self._data["state"] = "idle" if status == "done" else "error"
+            self._save()
+
     def submit(self, kind: str, fn: Callable[[], Any]) -> str:
         """Run fn in a background thread; track by task id. fn returns a JSON-safe dict."""
         task_id = f"{kind}_{uuid.uuid4().hex[:8]}"
         with self._lock:
+            if any(t.get("status") == "running" for t in self._data["tasks"].values()):
+                raise StateError("another simulation task is running; poll it before starting a new one")
             self._data["tasks"][task_id] = {
                 "kind": kind,
                 "status": "running",
@@ -149,7 +203,7 @@ class SessionState:
             task = self._data["tasks"].get(task_id)
             if task is None:
                 raise KeyError(f"unknown task id {task_id!r}")
-            return {k: v for k, v in task.items()}
+            return copy.deepcopy(task)
 
     def wait_task(self, task_id: str, timeout: float = 300.0, poll: float = 0.2) -> dict[str, Any]:
         deadline = time.monotonic() + timeout

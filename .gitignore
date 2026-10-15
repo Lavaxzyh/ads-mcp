@@ -8,3 +8,6 @@ __pycache__/
 sim_out*/
 *_wrk/
 scratch/
+de_sim.cfg
+hpeesofsim.cfg
+.ads-mcp/

@@ -73,6 +73,7 @@ class AdsEngine:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._design = None  # current open db_uu design (schematic)
+        self.workspace_path: str | None = None
 
     @contextlib.contextmanager
     def _op(self):
@@ -102,6 +103,8 @@ class AdsEngine:
             wp = Path(path).resolve()
             if de.workspace_is_open():
                 de.close_workspace()
+                self.workspace_path = None
+                self._design = None
             created = True
             if wp.exists():
                 # existing workspace: just open it instead of failing
@@ -110,6 +113,8 @@ class AdsEngine:
                 wp.parent.mkdir(parents=True, exist_ok=True)
                 de.create_workspace(str(wp))
             ws = de.open_workspace(str(wp))
+            self.workspace_path = str(wp)
+            self._design = None
             return {
                 "workspace": str(wp),
                 "created": created,
@@ -124,7 +129,11 @@ class AdsEngine:
                 raise FileNotFoundError(f"workspace not found: {wp}")
             if de.workspace_is_open():
                 de.close_workspace()
+                self.workspace_path = None
+                self._design = None
             ws = de.open_workspace(str(wp))
+            self.workspace_path = str(wp)
+            self._design = None
             return {"workspace": str(wp), "opened": ws is not None}
 
     def close_workspace(self) -> dict[str, Any]:
@@ -132,8 +141,11 @@ class AdsEngine:
             de = get_de()
             if de.workspace_is_open():
                 de.close_workspace()
+                self.workspace_path = None
                 self._design = None
                 return {"closed": True}
+            self.workspace_path = None
+            self._design = None
             return {"closed": False, "note": "no workspace was open"}
 
     # ---- schematic ----
@@ -613,15 +625,40 @@ class AdsEngine:
     # ---- results ----
     @staticmethod
     def _read_dataframe(ds_path: str, varblock: str | None = None):
+        import numpy as np
         import keysight.ads.dataset as dataset
 
         ds = dataset.open(str(ds_path), mode="r")
         keys = list(ds.keys())
-        if varblock is None:
-            varblock = keys[0]
-        if varblock not in keys:
+        if not keys:
+            raise ValueError("dataset has no varblocks")
+        if varblock is not None and varblock not in keys:
             raise KeyError(f"varblock {varblock!r} not in dataset keys {keys}")
-        return keys, ds[varblock].to_dataframe()
+        # Momentum uses 'data', circuit simulations commonly use 'SP1.SP'.
+        # Skip auxiliary blocks rather than assuming the first one is S data.
+        for key in ([varblock] if varblock else keys):
+            df = ds[key].to_dataframe()
+            if not any(re.fullmatch(r"S\[\d+,\d+\]", str(c)) for c in df.columns):
+                continue
+            if df.index.nlevels != 1:
+                raise ValueError("select a single frequency sweep before reading S parameters")
+            freq = df.index.to_numpy(dtype=float)
+            if not len(freq) or not np.isfinite(freq).all() or (freq < 0).any() or len(np.unique(freq)) != len(freq):
+                raise ValueError("S-parameter frequency axis must be finite, nonnegative and unique")
+            return keys, df.sort_index()
+        raise ValueError("no S-parameter varblock found in dataset")
+
+    def validate_momentum_dataset(self, ds_path: str, expected: dict[str, Any]) -> dict[str, Any]:
+        import numpy as np
+
+        with self._op():
+            _, df = self._read_dataframe(ds_path)
+            frequency = df.index.to_numpy(dtype=float)
+            target = np.linspace(expected["start_hz"], expected["stop_hz"], expected["points"])
+            if len(frequency) != len(target) or not np.allclose(frequency, target, rtol=0, atol=1.0):
+                raise ValueError("Momentum dataset does not match the configured frequency grid (1 Hz tolerance)")
+            return {"rows": int(len(df)), "freq_hz": [float(frequency[0]), float(frequency[-1])],
+                    "frequency_grid_verified": True, "interpolation_used": False}
 
     def get_results(self, ds_path: str, varblock: str | None = None) -> dict[str, Any]:
         with self._op():
@@ -666,8 +703,7 @@ class AdsEngine:
     def _s_preview(df, s_cols, max_points: int = 101) -> list[dict[str, Any]]:
         import numpy as np
 
-        step = max(1, len(df) // max_points)
-        sub = df.iloc[::step]
+        sub = df.iloc[np.linspace(0, len(df) - 1, min(len(df), max_points), dtype=int)]
         rows = []
         for f, r in sub.iterrows():
             row: dict[str, Any] = {"freq_hz": float(f)}
@@ -685,10 +721,13 @@ class AdsEngine:
 
         with self._op():
             keys, df = self._read_dataframe(ds_path)
-            s_cols = sorted(
-                (c for c in df.columns if c.startswith("S[")),
-                key=lambda c: tuple(int(x) for x in re.findall(r"\d+", c)),
-            )
+            if ports != 2:
+                raise ValueError("only two-port Touchstone export is supported")
+            # Touchstone 1.x two-port order is S11, S21, S12, S22.
+            s_cols = ["S[1,1]", "S[2,1]", "S[1,2]", "S[2,2]"]
+            present = {c for c in df.columns if re.fullmatch(r"S\[\d+,\d+\]", str(c))}
+            if present != set(s_cols):
+                raise ValueError("two-port dataset must contain S11, S21, S12 and S22")
             out = Path(out_path)
             out.parent.mkdir(parents=True, exist_ok=True)
             with out.open("w", encoding="ascii") as fh:
@@ -724,7 +763,7 @@ class AdsEngine:
             ax.set_xlabel("Frequency (GHz)")
             ax.set_ylabel("Magnitude (dB)")
             ax.set_title("S-Parameters")
-            ax.set_xlim(left=0)
+            ax.set_xlim(float(freq_ghz.min()), float(freq_ghz.max()))
             ax.grid(True, which="both", alpha=0.35)
             ax.legend(loc="best")
             fig.tight_layout()
