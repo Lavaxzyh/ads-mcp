@@ -10,21 +10,22 @@ English · [简体中文](README.zh-CN.md)
 ![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)
 ![ADS](https://img.shields.io/badge/Tested_on_Keysight_ADS_2027-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tools](https://img.shields.io/badge/Tools-28-4c1)
+![Tools](https://img.shields.io/badge/Tools-32-4c1)
 
 > This is an independent open-source project, not an official Keysight product. A separately installed copy of Keysight ADS with a valid license is required. This repository does not distribute ADS software or its proprietary components.
 
 ## Overview
 
-**ads-mcp v0.3.0** exposes ADS design and simulation operations through **28 MCP tools**, each with defined input parameters. It also records session and simulation task state.
+**ads-mcp v0.3.0** provides **32 MCP tools** for ADS design and simulation, with defined inputs and persisted session/task state. This version adds seven tools: four for planar EM modeling and three for native Momentum execution.
 
-The circuit workflow covers schematic construction, netlist generation, `hpeesofsim` execution, and S-parameter processing. The Momentum workflow runs an **existing saved native EM Setup** in a specified ADS GUI session, monitors solver progress, and checks the newly generated dataset and its frequency grid.
+The circuit workflow covers schematic construction, netlist generation, `hpeesofsim` execution, and S-parameter processing. The EM workflow creates substrates, geometry, ports, and native EM Setups from explicit parameters, then runs Momentum microwave simulation in ADS GUI, monitors progress, and checks the result frequency grid.
 
-Momentum support uses `bin/ads-mcp.exe` from the local ADS installation. Prepare and save the layout, substrate, ports, and native EM Setup in ADS before using these tools. See [Momentum workflow and supported scope](docs/momentum.md).
+Momentum execution uses `bin/ads-mcp.exe` from the local ADS installation. Use the modeling tools to build a project, or use an existing saved design. Save and close the MCP workspace before opening it in GUI for solving. See [planar EM modeling](docs/em-modeling.md) and the [Momentum workflow](docs/momentum.md).
 
 ## Features
 
 - **Schematic construction:** create workspaces and libraries, then place components, variables, ports, grounds, and wires.
+- **Planar EM modeling:** create layered dielectrics, conductor mappings, rectangle/polygon geometry, numbered ports, and native Momentum Setups. Millimeter inputs are converted to the library's actual layout units.
 - **Parameter checks:** automatically name microstrip substrates, protect string reference parameters, and query component and parameter names with `ads_browse_components`.
 - **Asynchronous circuit simulation:** submit a simulation and receive a `task_id`; query status and the resulting dataset path with `ads_get_sim_status`.
 - **Native Momentum simulation:** inspect saved EM Setups, discover ADS GUI sessions, start simulations, and monitor frequency progress and new results.
@@ -62,7 +63,7 @@ cd ads-mcp
 }
 ```
 
-Replace the repository and ADS paths with local absolute paths, save the configuration, and restart your MCP client, such as Claude Desktop, ZCode, or Cursor, to load the 28 `ads_*` tools.
+Replace the repository and ADS paths with local absolute paths, save the configuration, and restart your MCP client, such as Claude Desktop, ZCode, or Cursor, to load this branch's 32 `ads_*` tools.
 
 ### Path Configuration
 
@@ -91,7 +92,7 @@ You can also run the example script directly, without configuring an AI client:
 
 The script demonstrates filter construction, simulation, and result export in 15 steps, then opens the generated project in ADS GUI. Output is under `ADS_MCP_WORKROOT`, which defaults to `ads_mcp_demo` in the current user's home directory. Check the script's `WS` and `OUT` subdirectories before running: the script deletes and recreates both example directories.
 
-## Tool Reference (28 Tools)
+## Tool Reference (32 Tools)
 
 ### Environment & session (5)
 
@@ -133,7 +134,18 @@ The script demonstrates filter construction, simulation, and result export in 15
 | `ads_inspect_momentum_setup` | Read a saved native EM Setup, validate its local layout paths and one linear frequency sweep, and report an existing run reservation. |
 | `ads_run_momentum` | Validate the selected GUI workspace and setup link, launch once, and return a task ID. Poll with `ads_get_sim_status`; read/export/plot the dataset with the existing result tools. |
 
-Prepare and save the layout, substrate, ports, and native EM Setup, then open the workspace in ADS GUI. If this MCP server has a workspace open, close it with `ads_close_workspace` before dispatch. This release supports native calculation type `5` and one linear sweep, as validated on ADS 2027. Automated EM layout, substrate, and setup creation, and RFPro/FEM execution, are not yet supported. See [Momentum workflow](docs/momentum.md) for usage and recovery steps.
+Execution tools use saved setups, including those created by the modeling tools below. Close the MCP workspace with `ads_close_workspace` before opening it in ADS GUI for solving. The supported workflow uses Momentum microwave mode and one linear sweep; both setup inspection and solver logs check the mode. See [Momentum workflow](docs/momentum.md) for usage and recovery.
+
+### Planar EM modeling (4)
+
+| Tool | What it does |
+|---|---|
+| `ads_create_substrate` | Create a bottom-to-top dielectric stack with conductor mappings, thickness, conductivity, and optional ideal bottom ground. |
+| `ads_create_layout` | Create a new layout cellview from rectangles or simple polygons in millimeters on named drawing layers. |
+| `ads_add_layout_ports` | Add numbered point pins with position, direction, layer, and net while preserving existing geometry. |
+| `ads_configure_momentum_setup` | Create a native microwave setup from the installed ADS template, configuring a linear sweep, 50-ohm ground-referenced ports, local execution, and the layout link. |
+
+Construction uses the current MCP workspace and preserves existing substrates, layout views, and setups of the same name. See [planar EM modeling](docs/em-modeling.md) for supported scope and a complete example.
 
 ### Optimization (2)
 
@@ -158,9 +170,19 @@ Use the `opt_min` and `opt_max` parameters of `ads_add_var` to set a variable's 
 | `ads_get_results` | Read a dataset and return S-parameter dB extrema, band-edge values, the first frequency below −3 dB, and downsampled magnitude and phase previews. |
 | `ads_export_touchstone` | Export a two-port Touchstone `.s2p` file in `HZ S RI R 50` format. |
 | `ads_plot_sparams` | Plot \|S\| dB vs frequency (selectable columns) to a PNG. |
-| `ads_open_in_gui` | Open the current workspace in the ADS GUI (detached process, survives server restarts). |
+| `ads_open_in_gui` | Open the current or explicitly specified saved workspace in ADS GUI, including handoff after EM construction. |
 
-Current MCP registration: **28 tools** (25 existing + 3 Momentum tools).
+Registered tools: **32** (25 from v0.2.0 + 7 added in v0.3.0).
+
+## Build and Run a Momentum Model
+
+The example builds a new microstrip low-pass project through MCP, opens ADS GUI, runs the solver, and exports results:
+
+```bat
+.venv\Scripts\python.exe demo\build_momentum.py --workspace C:/ADS/em_demo_wrk --run
+```
+
+The workspace directory must not exist; existing directories are never deleted. Geometry, materials, ports, and the sweep come from [`demo/models/stepped_lpf.json`](demo/models/stepped_lpf.json). Use `--model` for another model file, or omit `--run` to build and save only.
 
 ## Momentum Example
 
@@ -225,17 +247,18 @@ Clone and view statistics are collected daily by [ghtraf](https://pypi.org/proje
 
 ## Validation
 
-Circuit/topology acceptance (`tests/test_full_flow.py`) and v0.3.0 Momentum
-validation (`demo/run_momentum.py`) on ADS 2027:
+ADS 2027 validation covers circuit/topology acceptance (`tests/test_full_flow.py`), saved-setup execution (`demo/run_momentum.py`), and this branch's construction workflow (`demo/build_momentum.py`):
 
-- 28 tools registered over stdio, with tool definitions checked.
+- 32 tools registered over stdio, with tool definitions checked.
 - Circuit construction: 13 instances placed, netlist checked, and simulation submitted and polled by task ID.
 - Circuit example response: approximately −0.08 dB in the passband, first sampled frequency below −3 dB at **1.025 GHz** (1 GHz design target), and approximately −38 dB at 6 GHz.
 - Result delivery: Touchstone and PNG export, and opening the project in ADS GUI.
 - LC filter examples: eight combinations of Butterworth and Chebyshev responses with four filter types. Example results include approximately 0.10 dB Chebyshev low-pass ripple and a 1.00 GHz Butterworth cutoff, with no component body collisions reported by the audit.
-- Unit and regression checks: 56 passed, covering path configuration, state recovery, duplicate dispatch prevention, result capture, and export behavior.
+- 93 unit and regression checks passed, covering modeling inputs, path configuration, state recovery, duplicate dispatch prevention, result capture, and export behavior.
 - Native Momentum: 0.05–4.00 GHz, 396 points, frequency-grid verification,
   server-restart monitoring, and result exports.
+- Automated construction: substrate, five microstrip sections, two ports, and a native setup, followed by GUI handoff, a 396-point microwave solve, and exports.
+- Additional construction checks: two dielectric layers, 35 µm copper, polygon geometry, mil unit conversion, and existing-port collision protection.
 
 ## Roadmap
 
@@ -243,14 +266,15 @@ validation (`demo/run_momentum.py`) on ADS 2027:
 - [x] Optimizer hooks (geometry → spec closed-loop tuning)
 - [x] Schematic audit & annotation auto-placement (KiCad eeschema-inspired)
 - [x] Native Momentum execution with an existing saved EM Setup
-- [ ] Automated EM layout/substrate/setup creation
+- [x] Parameterized planar EM geometry/substrate/port/setup creation
+- [ ] Infer complete EM geometry and vias from arbitrary schematics/PDKs
 - [ ] Multi-session registry (attach/audit concurrent ADS processes)
 - [ ] API doc search tool (complements the official server's `search_docs`)
 - [ ] Linux support where ADS supports it
 
 ## Community
 
-Report problems through Issues or contribute improvements through Pull Requests. The implementation has four core Python modules for MCP tools, the ADS engine, Momentum, and task state. Contributions of example scripts for circuit synthesis, PCB co-simulation, load-pull analysis, or other workflows are also welcome.
+Report problems through Issues or contribute improvements through Pull Requests. Core modules cover MCP tools, the ADS engine, EM modeling, Momentum, and task state. Contributions of example scripts for circuit synthesis, PCB co-simulation, load-pull analysis, or other workflows are also welcome.
 
 ## Acknowledgments
 

@@ -1,6 +1,6 @@
-# Native Momentum workflow (v0.3.0)
+# Native Momentum execution workflow
 
-The three Momentum tools run an **existing saved native EM Setup** through an
+The three execution tools run a **saved native EM Setup** through an
 ADS GUI session. They use the locally installed Keysight `bin/ads-mcp.exe`
 bridge and the AEL `deem_run_em_setup` path verified on ADS 2027 (v6.5.0).
 Keysight's executable, XML templates, OA designs and licenses are not included
@@ -11,12 +11,19 @@ the system `ProgramFiles/Keysight/ADS2027` default. The GUI bridge and circuit
 tools use the same installation setting. `ADS_MCP_WORKROOT` controls circuit
 example outputs; it does not change the existing workspace passed to Momentum.
 
+v0.3.0 also provides four [planar EM modeling tools](em-modeling.md)
+to create substrates, layouts, ports and setups. Build and save the project in
+the MCP workspace, close it, then open it in ADS GUI for this execution flow.
+The version contains 32 MCP tools in total, including seven added since v0.2.0.
+
 ## Prepare the project
 
-1. Prepare and save the layout, substrate, ports and native EM Setup in ADS.
+1. Create and save the layout, substrate, ports and native EM Setup using the
+   modeling tools, or use an existing ADS design.
 2. Open the workspace in the ADS GUI. Use a library inside the workspace,
    with simple library/cell/view names (letters, digits and underscores).
-3. Use the native calculation type `5` and one enabled linear sweep. This is
+3. Use native calculation type `5`, `SimSetupOverview/simulator=0` (microwave),
+   and one enabled linear sweep. This is
    the saved configuration tested with the Momentum microwave solver on ADS 2027.
    Other native calculation types and nonlinear/multiple sweeps are rejected.
 4. Enable dataset output, disable reuse of previous results, and use local,
@@ -24,9 +31,9 @@ example outputs; it does not change the existing workspace passed to Momentum.
 5. If this MCP server opened a workspace, call `ads_close_workspace` before
    using Momentum. The GUI session owns the design for this workflow.
 
-This release does not infer arbitrary layout geometry, create substrates or
-ports, construct native setup templates, or execute RFPro/FEM. The setup
-inspection is a configuration check, not a port or mesh accuracy assessment.
+Construction tools accept explicit planar geometry and stack parameters;
+automatic inference from arbitrary schematics/PDKs and RFPro/FEM execution
+are not supported. Setup inspection is a configuration check, not a port or mesh accuracy assessment.
 RF results can differ from circuit simulation because the physical models differ.
 
 ## Tool sequence
@@ -68,7 +75,7 @@ the GUI workspace or save another design.
 ## Completion and frequency grid
 
 Launching returns a task ID after the GUI accepts the command. Completion
-requires a changed Momentum log, successful solver completion markers, and a
+requires a changed Momentum log identifying **microwave mode**, successful solver completion markers, and a
 changed output dataset; copied/stale completed results do not qualify. The
 dataset must contain the configured number of points and match the complete
 linear frequency grid within **1 Hz**. No interpolation is used.
@@ -129,14 +136,16 @@ Touchstone output only after verified completion.
 
 ## 本版能力边界
 
-本版新增会话发现、原生 Momentum 配置检查和启动三个工具，工具总数为 28。
-已有的状态查询、数据读取、绘图和 Touchstone 导出继续复用。
+v0.3.0 包含 32 个工具，较 v0.2.0 新增四个平面建模工具和三个求解工具。
+会话发现、配置检查和启动三个求解工具继续
+复用状态查询、数据读取、绘图和 Touchstone 导出。
 
-需要在 ADS GUI 中打开工程，并事先保存版图、衬底、端口和原生 EM Setup。
+版图、衬底、端口和原生 EM Setup 可由建模工具创建，也可使用已有工程。
+自动建模完成后先保存并关闭 MCP 工作区，再在 ADS GUI 中打开工程求解。
 检查对象是 cellview 内的 `emStateFile.xml`，不是 `simulation` 下的生成副本。
 复制工程后应在 ADS 中重新绑定工程路径；工具会拒绝残留的旧路径。
 
-完成判定同时检查新日志、新数据集及完整频点网格，容差 1 Hz，不插值。
+完成判定同时检查新日志中的微波模式、新数据集及完整频点网格，容差 1 Hz，不插值。
 MCP 服务重启后可使用同一状态文件和 task_id 继续轮询。桥接超时不代表
 仿真未启动，因此不会自动重试或终止 ADS。错误恢复前应先在 ADS 中确认
 求解器已停止，再清理相应运行锁；具体步骤见上文。

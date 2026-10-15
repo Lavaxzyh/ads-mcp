@@ -1,0 +1,21 @@
+{
+  "lib": "em_demo_lib",
+  "cell": "stepped_lpf",
+  "substrate": "fr4_demo",
+  "dielectrics": [{"height_mm": 1.6, "er": 4.4, "loss_tangent": 0.02}],
+  "conductors": [{"layer": "cond", "interface": 1, "thickness_um": 0}],
+  "ground_bottom": true,
+  "shapes": [
+    {"kind": "rectangle", "points_mm": [[0, -0.4765], [17.35, 0.4765]]},
+    {"kind": "rectangle", "points_mm": [[17.35, -5.559], [30.9, 5.559]]},
+    {"kind": "rectangle", "points_mm": [[30.9, -0.4765], [60.79, 0.4765]]},
+    {"kind": "rectangle", "points_mm": [[60.79, -5.559], [74.34, 5.559]]},
+    {"kind": "rectangle", "points_mm": [[74.34, -0.4765], [91.69, 0.4765]]}
+  ],
+  "ports": [
+    {"name": "P1", "number": 1, "x_mm": 0, "y_mm": 0, "angle": 180},
+    {"name": "P2", "number": 2, "x_mm": 91.69, "y_mm": 0}
+  ],
+  "setup": "emSetup",
+  "sweep": {"start_ghz": 0.05, "stop_ghz": 4.0, "points": 396}
+}

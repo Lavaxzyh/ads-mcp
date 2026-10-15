@@ -10,21 +10,22 @@
 ![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)
 ![ADS](https://img.shields.io/badge/Tested_on_Keysight_ADS_2027-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tools](https://img.shields.io/badge/工具数-28-4c1)
+![Tools](https://img.shields.io/badge/工具数-32-4c1)
 
 > 本项目为第三方开源项目，非 Keysight 官方产品。使用前需自行安装 Keysight ADS 并具备有效许可证。本仓库不分发 ADS 软件及其专有组件。
 
 ## 项目概述
 
-**ads-mcp v0.3.0** 将 ADS 中的设计与仿真操作封装为 **28 个 MCP 工具**，为每个工具提供明确的参数定义，并记录会话与仿真任务状态。
+**ads-mcp v0.3.0** 提供 **32 个 MCP 工具**，覆盖 ADS 设计与仿真操作，并记录会话与任务状态。本版新增七个工具：四个平面 EM 建模工具与三个原生 Momentum 执行工具。
 
-电路仿真流程覆盖原理图搭建、网表生成、`hpeesofsim` 求解和 S 参数处理。Momentum 流程通过指定的 ADS GUI 会话运行**已有且已保存的原生 EM Setup**，监控求解进度，检查新生成的数据集及其频率网格。
+电路仿真流程覆盖原理图搭建、网表生成、`hpeesofsim` 求解和 S 参数处理。EM 流程支持按材料参数和几何坐标创建衬底、版图、端口与原生 EM Setup，再通过 ADS GUI 会话执行 Momentum 微波仿真，监控求解进度并检查结果频率网格。
 
-Momentum 功能调用本机 ADS 安装目录中的 `bin/ads-mcp.exe`。使用前需在 ADS 中准备并保存版图、衬底、端口和原生 EM Setup，详见 [Momentum 工作流与支持范围](docs/momentum.md)。
+Momentum 求解调用本机 ADS 安装目录中的 `bin/ads-mcp.exe`。可使用建模工具创建工程，也可使用已有的 ADS 工程。建模后先保存并关闭 MCP 工作区，再在 GUI 中打开求解。详见 [平面 EM 建模](docs/em-modeling.md)与 [Momentum 工作流](docs/momentum.md)。
 
 ## 主要功能
 
 - **原理图搭建**：创建工作区与设计库，放置元件、变量、端口、接地符号和导线。
+- **平面 EM 建模**：创建多层介质衬底、导体层映射、矩形/多边形版图、编号端口和原生 Momentum Setup；几何输入采用毫米，并转换为设计库实际单位。
 - **参数检查**：自动命名微带衬底，保护字符串引用参数，并通过 `ads_browse_components` 查询元件及参数名称。
 - **异步电路仿真**：提交仿真后返回 `task_id`，通过 `ads_get_sim_status` 查询状态和数据集路径。
 - **原生 Momentum 仿真**：检查已保存的 EM Setup、发现 ADS GUI 会话、启动仿真，并监控频点进度和新结果。
@@ -62,7 +63,7 @@ cd ads-mcp
 }
 ```
 
-将配置中的仓库路径和 ADS 安装路径替换为本机绝对路径，保存后重启 MCP 客户端（如 Claude Desktop、ZCode 或 Cursor），即可加载 28 个 `ads_*` 工具。
+将配置中的仓库路径和 ADS 安装路径替换为本机绝对路径，保存后重启 MCP 客户端（如 Claude Desktop、ZCode 或 Cursor），即可加载当前分支的 32 个 `ads_*` 工具。
 
 ### 路径配置
 
@@ -91,7 +92,7 @@ $env:ADS_MCP_WORKROOT = Join-Path $HOME "ads_mcp_demo"
 
 该脚本分 15 步演示滤波器搭建、仿真和结果导出，并在 ADS GUI 中打开生成的工程。输出位于 `ADS_MCP_WORKROOT`（默认当前用户主目录下的 `ads_mcp_demo`）。运行前请检查脚本中的 `WS`、`OUT` 子目录；脚本会删除并重建这两个示例目录。
 
-## 工具列表（28 个）
+## 工具列表（32 个）
 
 ### 环境与会话（5 个）
 
@@ -133,7 +134,18 @@ $env:ADS_MCP_WORKROOT = Join-Path $HOME "ads_mcp_demo"
 | `ads_inspect_momentum_setup` | 只读检查原生 EM Setup、本地版图路径、单段线性扫频和已有运行锁。 |
 | `ads_run_momentum` | 核对指定 GUI 会话的工作区及 EM Setup 关联后启动仿真，返回 `task_id`。后续通过状态与结果工具查询、读取、绘图和导出。 |
 
-使用前需准备并保存版图、衬底、端口和原生 EM Setup，并在 ADS GUI 中打开相应工作区。如果本 MCP 服务器已打开工作区，需先调用 `ads_close_workspace` 释放。本版支持 ADS 2027 上已验证的原生计算类型 `5` 和单段线性扫频。自动创建 EM 版图、衬底和 Setup，以及 RFPro/FEM 执行尚未支持。操作与恢复方法见 [Momentum 工作流](docs/momentum.md)。
+原生求解工具运行已保存的配置，配置可由下方建模工具创建。求解前先用 `ads_close_workspace` 释放 MCP 工作区，再在 ADS GUI 中打开工程。支持已验证的 Momentum 微波模式和单段线性扫频，配置与求解日志均会核对模式。操作与恢复方法见 [Momentum 工作流](docs/momentum.md)。
+
+### 平面 EM 建模（4 个）
+
+| 工具 | 功能 |
+|---|---|
+| `ads_create_substrate` | 按自下而上的介质层参数、导体层映射、厚度与电导率创建衬底，可选择理想底部接地。 |
+| `ads_create_layout` | 按毫米坐标和导体层名称创建矩形或简单多边形版图，并保存至新 cellview。 |
+| `ads_add_layout_ports` | 为已有版图添加编号点引脚，设置位置、方向、导体层和网络，保留已有几何。 |
+| `ads_configure_momentum_setup` | 从本机 ADS 模板创建原生微波 Setup，配置线性扫频、50 Ω 对地端口与本地求解，并建立版图关联。 |
+
+建模在 MCP 当前工作区内完成，新建对象不覆盖同名衬底、版图或 Setup。支持范围及完整示例见 [平面 EM 建模](docs/em-modeling.md)。
 
 ### 优化（2 个）
 
@@ -158,9 +170,19 @@ $env:ADS_MCP_WORKROOT = Join-Path $HOME "ads_mcp_demo"
 | `ads_get_results` | 读取数据集，返回各 S 参数的 dB 极值、频带端点值、首个低于 −3 dB 的频点，以及降采样后的幅度与相位预览。 |
 | `ads_export_touchstone` | 导出双端口 Touchstone `.s2p` 文件，格式为 `HZ S RI R 50`。 |
 | `ads_plot_sparams` | 将所选 S 参数的幅度（dB）随频率变化曲线保存为 PNG。 |
-| `ads_open_in_gui` | 启动 ADS GUI 并打开当前工作区，GUI 进程独立于 MCP 服务运行。 |
+| `ads_open_in_gui` | 启动 ADS GUI，打开当前或显式指定的已保存工作区；支持建模后的工程交接。 |
 
-当前注册工具数：**28**（原有 25 个 + Momentum 新增 3 个）。
+注册工具数：**32**（v0.2.0 的 25 个 + v0.3.0 新增 7 个工具）。
+
+## 从建模到 Momentum 求解
+
+以下示例通过 MCP 创建全新的微带低通工程，再打开 ADS GUI 执行仿真并导出结果：
+
+```bat
+.venv\Scripts\python.exe demo\build_momentum.py --workspace C:/ADS/em_demo_wrk --run
+```
+
+工程目录必须不存在，脚本不会删除已有目录。几何、材料、端口和扫频来自 [`demo/models/stepped_lpf.json`](demo/models/stepped_lpf.json)，可用 `--model` 指定自己的模型文件。省略 `--run` 可仅构建并保存工程。
 
 ## Momentum 使用示例
 
@@ -225,17 +247,18 @@ ads_open_in_gui()                                       # 在 ADS 中查看原�
 
 ## 验证记录
 
-ADS 2027 上的电路/拓扑验收（`tests/test_full_flow.py`）及 v0.3.0 Momentum
-验收（`demo/run_momentum.py`）：
+ADS 2027 上的电路/拓扑验收（`tests/test_full_flow.py`）、已有配置求解（`demo/run_momentum.py`）及当前分支的自动建模流程（`demo/build_momentum.py`）：
 
-- 28 个工具通过 stdio 注册，并检查工具定义。
+- 32 个工具通过 stdio 注册，并检查工具定义。
 - 电路搭建：放置 13 个实例、检查网表，并通过任务 ID 提交和查询仿真。
 - 电路示例结果：通带约 −0.08 dB，首个低于 −3 dB 的频点为 **1.025 GHz**（设计目标 1 GHz），6 GHz 处响应约 −38 dB。
 - 结果交付：Touchstone 与 PNG 导出，以及在 ADS GUI 中打开工程。
 - LC 滤波器示例：验证 Butterworth、Chebyshev 两类响应与四种滤波类型的 8 种组合。示例结果包括 Chebyshev 低通带内纹波约 0.10 dB、Butterworth 截止频率约 1.00 GHz，审计未报告元件本体碰撞。
-- 单元与回归检查：56 项通过，覆盖路径配置、状态恢复、重复启动防护、结果归档和导出等行为。
+- 93 项单元与回归检查通过，覆盖建模参数、路径配置、状态恢复、重复启动防护、结果归档和导出等行为。
 - 原生 Momentum：0.05–4.00 GHz、396 点，频点网格核对、服务重启后继续
   监控及结果导出。
+- 自动构建示例：创建衬底、五段微带几何、两个端口和原生 Setup，交接 GUI 后完成 396 点微波模式求解与导出。
+- 扩展建模示例：验证双介质层、35 μm 铜层、多边形、mil 单位转换及已有端口冲突保护。
 
 ## 路线图
 
@@ -243,14 +266,15 @@ ADS 2027 上的电路/拓扑验收（`tests/test_full_flow.py`）及 v0.3.0 Mome
 - [x] 优化器对接（设计参数与响应指标优化）
 - [x] 原理图审计与标注自动避让（参考 KiCad eeschema）
 - [x] 已有原生 EM Setup 的 Momentum 执行流程
-- [ ] EM 版图、衬底和 Setup 自动创建
+- [x] 参数化平面 EM 版图、衬底、端口和 Setup 创建
+- [ ] 从任意原理图/PDK 自动推导完整 EM 几何及过孔结构
 - [ ] 多会话注册表（并发 ADS 进程的连接与审计）
 - [ ] API 文档检索工具（与官方服务器的 `search_docs` 互补）
 - [ ] ADS 支持范围内的 Linux 支持
 
 ## 社区
 
-欢迎通过 Issue 反馈问题，或通过 Pull Request 提交改进。核心实现由 MCP 工具、ADS 引擎、Momentum 和任务状态四个 Python 模块组成。基于本项目实现的电路综合、PCB 协同仿真或负载牵引等流程，也欢迎以示例脚本的形式贡献。
+欢迎通过 Issue 反馈问题，或通过 Pull Request 提交改进。核心模块覆盖 MCP 工具、ADS 引擎、EM 建模、Momentum 和任务状态。基于本项目实现的电路综合、PCB 协同仿真或负载牵引等流程，也欢迎以示例脚本的形式贡献。
 
 ## 致谢
 

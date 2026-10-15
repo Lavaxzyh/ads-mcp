@@ -69,6 +69,9 @@ def inspect_setup(workspace: str, setup_file: str, setup: str = "emSetup") -> di
     main = root.find("MainWindow")
     if main is None or main.findtext("simCalculationType") != "5":
         raise ValueError("only native calculation type 5 has been validated on ADS 2027")
+    mode = main.findtext("SimSetupOverview/simulator")
+    if mode != "0":
+        raise ValueError("only Momentum microwave mode (SimSetupOverview/simulator=0) is supported")
     layout = main.find("MomLayout")
     if layout is None:
         raise ValueError("setup has no Momentum layout")
@@ -120,6 +123,7 @@ def inspect_setup(workspace: str, setup_file: str, setup: str = "emSetup") -> di
             "lib": lib, "cell": cell, "view": view, "setup": setup,
             "simulation_dir": str(sim_dir), "log": str(sim_dir / "proj.log"),
             "frequency": {"start_hz": start, "stop_hz": stop, "step_hz": step, "points": points},
+            "simulation_mode": "microwave",
             "requires_gui": True, "run_lock": str(run_lock), "existing_run_lock": run_lock.exists()}
 
 
@@ -404,6 +408,8 @@ class MomentumRunner:
                     try:
                         if "Momentum MomEngine" not in header:
                             raise ValueError("fresh log does not identify the Momentum solver")
+                        if not re.search(r"Simulation Mode:\s*(?:uW|MW|Microwave)\b", header, re.I):
+                            raise ValueError("fresh log does not identify Momentum microwave mode")
                         grid = validate_dataset(str(dataset), monitor["frequency"])
                         captured = self._snapshot(monitor, task_id, dataset, log)
                     except Exception as exc:
@@ -411,6 +417,6 @@ class MomentumRunner:
                     else:
                         progress["current_point"] = monitor["frequency"]["points"]
                         state.update_external_task(task_id, status="done", progress=progress,
-                                                   result={**captured, **grid})
+                                                   result={**captured, **grid, "simulation_mode": "microwave"})
                     self._release(monitor)
         return state.task_status(task_id)

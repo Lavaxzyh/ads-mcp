@@ -817,7 +817,7 @@ class AdsEngine:
     # ---- GUI ----
     def open_in_gui(self, workspace_path: str) -> dict[str, Any]:
         hpeesof_dir = ensure_env()
-        exe = Path(hpeesof_dir, "bin", "hpeesofde.exe")
+        exe = Path(hpeesof_dir, "bin", "ads.exe")
         if not exe.exists():
             raise FileNotFoundError(exe)
         flags = 0
@@ -826,10 +826,11 @@ class AdsEngine:
             # must never take the user's ADS GUI with it
             flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
         proc = subprocess.Popen(
-            [str(exe), "-w", str(Path(workspace_path).resolve())],
-            cwd=str(exe.parent),
+            [str(exe)],
+            cwd=str(Path(workspace_path).resolve()),
             creationflags=flags,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        return {"gui_pid": proc.pid, "workspace": str(workspace_path)}
+        return {"gui_pid": proc.pid, "workspace": str(workspace_path),
+                "note": "Launcher PID; use ads_list_gui_sessions for the actual GUI session ID"}

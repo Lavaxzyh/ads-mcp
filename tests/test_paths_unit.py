@@ -77,6 +77,21 @@ class PathTests(unittest.TestCase):
             self.assertEqual(engine.browse_components("test_lib")["cells"], ["test_cell"])
             self.assertEqual(engine.browse_components()["libraries"]["test_lib"], ["test_cell"])
 
+    def test_gui_uses_ads_launcher_and_workspace_working_directory(self):
+        install = self.root / "ADS"
+        (install / "bin").mkdir(parents=True)
+        (install / "bin" / "ads.exe").touch()
+        workspace = self.root / "workspace"
+        workspace.mkdir()
+        with patch.object(ads_engine, "ensure_env", return_value=str(install)), patch.object(
+            ads_engine.subprocess, "Popen"
+        ) as launch:
+            launch.return_value.pid = 123
+            result = ads_engine.AdsEngine().open_in_gui(str(workspace))
+        self.assertEqual(launch.call_args.args[0], [str(install / "bin" / "ads.exe")])
+        self.assertEqual(launch.call_args.kwargs["cwd"], str(workspace))
+        self.assertEqual(result["gui_pid"], 123)
+
 
 if __name__ == "__main__":
     unittest.main()

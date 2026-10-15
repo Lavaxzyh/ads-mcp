@@ -28,6 +28,7 @@ class SetupFixture(unittest.TestCase):
         self.root = ET.Element("EmSimSetup")
         self.main = ET.SubElement(self.root, "MainWindow")
         ET.SubElement(self.main, "simCalculationType").text = "5"
+        ET.SubElement(ET.SubElement(self.main, "SimSetupOverview"), "simulator").text = "0"
         layout = ET.SubElement(self.main, "MomLayout")
         for tag, value in {"workspaceText": str(self.ws), "libraryText": "lib", "cellText": "cell", "viewText": "layout"}.items():
             ET.SubElement(layout, tag).text = value
@@ -62,12 +63,43 @@ class SetupFixture(unittest.TestCase):
         return self.runner.start(self.state, 123, str(self.ws), str(self.xml))["task_id"]
 
     def finished_log(self, name="cell_MomUW"):
-        self.log.write_text('Momentum MomEngine_64 2027\nSimulation frequency [396] = 4 GHz\n'
+        self.log.write_text('Momentum MomEngine_64 2027\nSimulation Mode: uW\nSimulation frequency [396] = 4 GHz\n'
                             'S-parameter simulation finished\nSimulation finished on: today\n'
                             f'The simulation results have been saved in dataset "{name}".\n')
 
     def test_inspect_396_grid(self):
         self.assertEqual(self.info["frequency"], {"start_hz": 5e7, "stop_hz": 4e9, "step_hz": 1e7, "points": 396})
+
+    def test_legacy_calculation_field_cannot_hide_rf_mode(self):
+        self.main.find("SimSetupOverview/simulator").text = "1"
+        self.save()
+        with self.assertRaisesRegex(ValueError, "microwave mode"):
+            inspect_setup(str(self.ws), str(self.xml))
+
+    def test_missing_mode_selection_is_rejected(self):
+        self.main.remove(self.main.find("SimSetupOverview"))
+        self.save()
+        with self.assertRaisesRegex(ValueError, "microwave mode"):
+            inspect_setup(str(self.ws), str(self.xml))
+
+    def test_rf_solver_log_cannot_complete_microwave_task(self):
+        tid = self.start()
+        self.finished_log()
+        self.log.write_text(self.log.read_text().replace("Simulation Mode: uW", "Simulation Mode: RF"))
+        self.ds.write_bytes(b"fresh")
+        result = self.runner.poll(self.state, tid, self.validate)
+        self.assertEqual(result["status"], "error")
+        self.assertIn("microwave mode", result["error"])
+        self.validate.assert_not_called()
+
+    def test_missing_mode_marker_cannot_complete_task(self):
+        tid = self.start()
+        self.finished_log()
+        self.log.write_text(self.log.read_text().replace("Simulation Mode: uW\n", ""))
+        self.ds.write_bytes(b"fresh")
+        result = self.runner.poll(self.state, tid, self.validate)
+        self.assertEqual(result["status"], "error")
+        self.assertIn("microwave mode", result["error"])
 
     def test_copied_workspace_is_rejected(self):
         self.main.find("MomLayout/workspaceText").text = str(self.ws / "old")
@@ -183,7 +215,7 @@ class SetupFixture(unittest.TestCase):
         tid = self.start()
         self.finished_log()
         ending = self.log.read_text().split("\n", 1)[1]
-        self.log.write_text("Momentum MomEngine_64 2027\n" + "line\n" * 110_000 + ending)
+        self.log.write_text("Momentum MomEngine_64 2027\nSimulation Mode: uW\n" + "line\n" * 110_000 + ending)
         self.ds.write_bytes(b"new")
         self.assertEqual(self.runner.poll(self.state, tid, self.validate)["status"], "done")
 

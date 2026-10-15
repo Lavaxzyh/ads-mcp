@@ -19,6 +19,7 @@ from mcp.server.fastmcp import FastMCP
 
 from ads_engine import AdsEngine, ensure_env, get_ads_install_dir, get_workroot
 from momentum import MomentumRunner, inspect_setup
+from em_modeling import ConductorLayer, DielectricLayer, EmModeler, LayoutPort, LayoutShape
 from session_state import SessionState, StateError
 
 _HERE = Path(__file__).resolve().parent
@@ -34,12 +35,15 @@ ads_browse_components to discover library/cell/parameter names before placing
 unfamiliar parts.  Microstrip cells (MLIN, MSUB, MTEE, ...) live in
 `ads_tlines`; controllers and ports in `ads_simulation`; VAR/MeasEqn in
 `ads_datacmps`.  Simulation requires the schematic on file: the tools save
-automatically before netlisting. For Momentum, prepare a native EM Setup in
-ADS, open its workspace in an ADS GUI session, call ads_list_gui_sessions and
+automatically before netlisting. Build planar EM models in this server's
+workspace with ads_create_substrate, ads_create_layout, ads_add_layout_ports
+and ads_configure_momentum_setup, or use an existing saved native EM Setup.
+Save/close the server workspace, open it in ADS GUI, call ads_list_gui_sessions and
 ads_inspect_momentum_setup, then ads_run_momentum and poll ads_get_sim_status.
 Close any workspace owned by this server with ads_close_workspace before
-using the GUI Momentum path. The tools validate saved setups and do not
-generate arbitrary layouts, substrates or RFPro views."""
+using the GUI Momentum path. Geometry is supplied as explicit rectangles or
+polygons; arbitrary schematic/PDK artwork inference and RFPro/FEM execution
+are not provided."""
 
 mcp = FastMCP("ads-mcp", instructions=INSTRUCTIONS)
 # FastMCP does not expose the server version; report ours instead of the SDK's
@@ -47,6 +51,7 @@ mcp._mcp_server.version = "0.3.0"
 engine = AdsEngine()
 state = SessionState(Path(os.environ.get("ADS_MCP_STATE_FILE") or _HERE / "state" / "session_state.json"))
 momentum = MomentumRunner(get_ads_install_dir() / "bin" / "ads-mcp.exe")
+em_modeler = EmModeler()
 _workspace_dispatch_lock = threading.RLock()
 
 
@@ -364,6 +369,87 @@ def ads_list_gui_sessions() -> dict[str, Any]:
         return _err(exc)
 
 
+def _model_operation(lib: str, operation: str, **data) -> dict[str, Any]:
+    try:
+        _ensure_no_running_tasks()
+        if engine.workspace_path is None:
+            raise StateError("open a workspace with ads_create_workspace or ads_open_workspace before modeling")
+        with engine._op():
+            return _ok(**em_modeler.execute(engine.workspace_path, lib, operation, **data))
+    except Exception as exc:
+        return _err(exc)
+
+
+@mcp.tool()
+@_serialize_workspace
+def ads_create_substrate(lib: str, name: str,
+                         dielectrics: list[DielectricLayer], conductors: list[ConductorLayer],
+                         ground_bottom: bool = True) -> dict[str, Any]:
+    """Create a parameterized planar substrate in the current local library.
+
+    dielectrics are bottom-to-top, with height_mm, er and loss_tangent.
+    conductors map existing drawing layer names to interface 1..N above N
+    dielectrics, with thickness_um and optional conductivity_s_per_m (null =
+    perfect conductor). Bottom ground is an ideal cover when enabled; top is
+    open air. A new substrate name is required; existing substrates/materials
+    are preserved. New libraries receive standard ADS layout technology.
+    """
+    return _model_operation(lib, "substrate", name=name,
+                            dielectrics=dielectrics, conductors=conductors, ground_bottom=ground_bottom)
+
+
+@mcp.tool()
+@_serialize_workspace
+def ads_create_layout(lib: str, cell: str,
+                      shapes: list[LayoutShape], view: str = "layout") -> dict[str, Any]:
+    """Create and save a planar layout from parameterized rectangles/polygons.
+
+    Each shape specifies kind, points_mm and an existing drawing layer name.
+    A rectangle has lower-left/upper-right corners; polygons have distinct
+    vertices without a repeated closing point. Coordinates are millimeters
+    and converted to the library's layout units. Existing views are rejected.
+    This accepts explicit geometry; it does not infer arbitrary schematic or
+    PDK artwork. Use ads_add_layout_ports after creation.
+    """
+    return _model_operation(lib, "layout", cell=cell, view=view, shapes=shapes)
+
+
+@mcp.tool()
+@_serialize_workspace
+def ads_add_layout_ports(lib: str, cell: str,
+                         ports: list[LayoutPort], view: str = "layout") -> dict[str, Any]:
+    """Add numbered point pins to an existing saved layout in this workspace.
+
+    Each pin specifies name, number, x_mm, y_mm, optional angle, layer and
+    net. Names and numbers must be distinct, including existing terminals.
+    For Momentum, use consecutive terminal numbers starting at 1. Port
+    impedance/reference mapping is created by ads_configure_momentum_setup.
+    """
+    return _model_operation(lib, "ports", cell=cell, view=view, ports=ports)
+
+
+@mcp.tool()
+@_serialize_workspace
+def ads_configure_momentum_setup(lib: str, cell: str,
+                                  substrate: str, start_ghz: float, stop_ghz: float, points: int,
+                                  view: str = "layout", setup: str = "emSetup") -> dict[str, Any]:
+    """Create/link a native Momentum setup from the local ADS RFBoard template.
+
+    Uses existing local layout and substrate, a single linear frequency sweep,
+    microwave mode, local execution, fresh results and numbered single-pin 50-ohm ground-
+    referenced ports with a bottom ground cover. The installed vendor template
+    is read at runtime; none is distributed. Existing setup names are rejected
+    to retain prior setups.
+    The native dataset uses the cell name; completed tasks retain unique
+    copies. The returned setup_file can be passed to ads_run_momentum after
+    closing the server workspace and opening the saved workspace in ADS GUI.
+    """
+    return _model_operation(lib, "setup", cell=cell, view=view,
+                            substrate=substrate, start_ghz=start_ghz, stop_ghz=stop_ghz,
+                            points=points, setup=setup, dataset=cell,
+                            impedance_ohms=50.0)
+
+
 @mcp.tool()
 def ads_inspect_momentum_setup(workspace: str, setup_file: str, setup: str = "emSetup") -> dict[str, Any]:
     """Inspect a saved native Momentum setup, its layout, paths and linear sweep.
@@ -388,8 +474,8 @@ def ads_run_momentum(session_id: int, workspace: str, setup_file: str, setup: st
     owned by this server with ads_close_workspace. The tool verifies the GUI
     workspace/library/setup link, returns task_id, and never closes ADS or
     silently switches workspaces. Poll ads_get_sim_status for fresh outputs
-    and configured frequency-grid validation. No automated setup creation or
-    RFPro execution is provided. A reservation prevents duplicate dispatches.
+    and configured frequency-grid validation. Saved setups can be created by
+    ads_configure_momentum_setup. A reservation prevents duplicate dispatches.
     """
     try:
         _ensure_no_running_tasks()
@@ -481,16 +567,23 @@ def ads_audit_schematic(lib: str = "", cell: str = "") -> dict[str, Any]:
 
 
 @mcp.tool()
-def ads_open_in_gui() -> dict[str, Any]:
-    """Open the current workspace in the ADS GUI for visual inspection.
+@_serialize_workspace
+def ads_open_in_gui(workspace: str = "") -> dict[str, Any]:
+    """Open the current or explicitly specified saved workspace in ADS GUI.
 
     The GUI process is detached from this server, so it survives MCP restarts.
+    For EM handoff, close the server workspace first, then pass its saved path
+    explicitly; the GUI loads the newly created substrate materials on open.
     """
     try:
-        ws = state.get("workspace_path")
+        _ensure_no_running_tasks()
+        ws = workspace.strip() or state.get("workspace_path")
         if not ws:
             raise RuntimeError("no workspace open in this session")
-        result = engine.open_in_gui(ws)
+        target = Path(ws).expanduser().resolve(strict=True)
+        if not (target / "lib.defs").is_file():
+            raise ValueError("workspace must contain lib.defs")
+        result = engine.open_in_gui(str(target))
         state.set_field("gui_pid", result["gui_pid"])
         return _ok(**result)
     except Exception as exc:  # noqa: BLE001
