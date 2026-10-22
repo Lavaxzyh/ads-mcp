@@ -235,7 +235,7 @@ The response values shown are from earlier circuit simulation acceptance checks.
 
 ![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png)
 
-Clone and view statistics are collected daily by [ghtraf](https://pypi.org/project/github-traffic-tracker/) and saved to a public Gist for historical tracking. The badges at the top of this README use the same data source.
+Clone and view statistics are collected every three hours and saved to a public Gist. All recorded daily history is retained; GitHub's rolling 14-day API window is used to backfill daily records, not as a replacement for the lifetime total. The curve shows daily raw clone counts and cumulative clones across all saved history. Pending dates are shown as gaps with shaded bands, and the chart includes the last collection time in UTC. The clone/install badges use a separate estimate that subtracts CI checkouts. See [traffic collection](docs/traffic.md) for the data definitions and refresh workflow.
 
 ## Requirements
 

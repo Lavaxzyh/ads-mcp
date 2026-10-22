@@ -235,7 +235,7 @@ ads_open_in_gui()                                       # 在 ADS 中查看原�
 
 ![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png)
 
-克隆与浏览数据由 [ghtraf](https://pypi.org/project/github-traffic-tracker/) 每日采集并保存至公开 Gist，用于保留长期历史。README 顶部徽章使用同一数据源。
+克隆与浏览数据每三小时采集一次并保存至公开 Gist，保留全部已记录的每日历史。GitHub 最近 14 天的 API 数据用于补齐每日记录，长期累计不会替换成最近 14 天的总数。曲线展示每日原始克隆次数与全部已存历史的累计克隆次数；待更新日期以断点和阴影表示，并标注最近采集时间（UTC）。克隆与安装徽章另采用扣除估算 CI checkout 的口径。详见[流量采集说明](docs/traffic.md)。
 
 ## 环境要求
 

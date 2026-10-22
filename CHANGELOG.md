@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Repository traffic
+
+- Collect traffic every three hours and retain all recorded daily history.
+- Merge delayed API observations by date without adding repeated snapshots
+  twice; preserve earlier cumulative totals when daily detail is incomplete.
+- Distinguish pending data from API-reported zeros and plot cumulative raw
+  clone events with collection timestamps.
+- Stop before publishing if saved history is unavailable, and render from
+  the exact collected snapshot rather than a cached raw Gist response.
+
 ## 0.3.0 (2026-10-15)
 
 ### Added
