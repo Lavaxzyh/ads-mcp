@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      TRAFFIC_STATE_PATH: ${{ runner.temp }}/traffic-state.json
+      TRAFFIC_STATE_PATH: ${{ github.workspace }}/traffic-state.json
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
