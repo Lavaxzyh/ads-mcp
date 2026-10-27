@@ -1,0 +1,49 @@
+; Top Design: "full_patch_lib:full_em_optimizer_tb:schematic"
+; Netlisted using Hierarchy Policy: "Standard"
+
+Options ResourceUsage=yes UseNutmegFormat=no EnableOptim=no TopDesignName="full_patch_lib:full_em_optimizer_tb:schematic" DcopOutputNodeVoltages=yes DcopOutputPinCurrents=yes DcopOutputAllSweepPoints=no DcopOutputDcopType=0
+; Library Name: full_patch_lib
+; Cell Name: matched_patch
+; View Name: emModelOpt
+define matched_patch ( P1  ref=0 ) 
+parameters  Wm=0.7035945810262776  Lm=19.96929794249173 
+; MomCmpt model has node 0 as implicit reference. Ref node will be ignored and assumed to be grounded!
+em_data_name="full_patch_lib:matched_patch:emModelOpt"
+MomCmpt:em_data  P1 \
+    name=em_data_name \
+    paramFile="" \
+    modelFile="C:/ADS/examples/microstrip_patch_em_optimization/workspace/full_patch_lib/matched_patch/em%Model%Opt/model.ndx" \
+    ModelReuse=1 \
+    ModelType="MOMMW" \
+    ExtrapolationMode="linear" \
+    EnforcePassivity=-1
+end matched_patch
+
+
+X=1.0
+Wm_tune=.7035945810262776 opt{0.4 to 1.2}
+Lm_tune=19.96929794249173 opt{16 to 23}
+matched_patch:DUT  N__0 Wm=Wm_tune Lm=Lm_tune 
+Port:PORT1  N__0 0 Num=1 Z=50 Ohm Noise=yes 
+S_Param:SP1 CalcS=yes CalcY=no CalcZ=no GroupDelayAperture=1e-4 FreqConversion=no FreqConversionPort=1 StatusLevel=2 CalcNoise=no SortNoise=0 BandwidthForNoise=1.0 Hz DevOpPtLevel=0 SPSS_WSP=yes \
+SweepVar="freq" SweepPlan="SP1_stim" OutputPlan="SP1_Output" 
+
+SweepPlan: SP1_stim Start=2.4 GHz Stop=2.401 GHz Step=.001 GHz 
+
+OutputPlan:SP1_Output \
+      Type="Output" \
+      UseEquationNestLevel=yes \
+      EquationNestLevel=2 \
+      UseSavedEquationNestLevel=yes \
+      SavedEquationNestLevel=2
+
+#load "python","LinearCollapse"
+Component Module="LinearCollapse" Type="ModelExtractor" NetworkRepresentation=2
+OptimGoal:GOAL1 Expr="dB(S(1,1))" SimInstanceName="SP1" Weight=1.0 \
+IndepVar[1]="freq" \
+SpecLimitLine[1]="GOAL1_Limit1" 
+SpecLimitLine:"GOAL1_Limit1" Type="LessThan" Max=-40 Weight=1.0 \
+IndepVar[1]="freq" IndepMin[1]=2400000000 IndepMax[1]=2400000000 
+
+Optim:"OPT1" OptimType="hpVMO" ErrorForm="L2" SAProgressReport=0 MaxIters=12 P=2 DesiredError=0.0 StatusLevel=4 FinalAnalysis="None" NormalizeGoals=yes SetBestValues=yes SaveSolns=yes SaveGoals=yes SaveOptimVars=no UpdateDataset=yes SaveNominal=no SaveAllIterations=no UseAllOptVars=yes UseAllGoals=yes SaveCurrentEF=no InitialTempControlMode=0 SANumTrialsPerIter=10 NumShootsPerIter=20 SATempControlAlpha=0.8 CoranaSkip=0.0 EnableCockpit=yes NormalizeError=yes SaveAllTrials=no UseAdvTermCriteria=no CostRelativeTol=1.0e-8 LimitOfContSmallImprovement=5 
+

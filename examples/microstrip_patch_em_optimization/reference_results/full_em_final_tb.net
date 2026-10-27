@@ -1,0 +1,41 @@
+; Top Design: "full_patch_lib:full_em_final_tb:schematic"
+; Netlisted using Hierarchy Policy: "Standard"
+
+Options ResourceUsage=yes UseNutmegFormat=no EnableOptim=no TopDesignName="full_patch_lib:full_em_final_tb:schematic" DcopOutputNodeVoltages=yes DcopOutputPinCurrents=yes DcopOutputAllSweepPoints=no DcopOutputDcopType=0
+; Library Name: full_patch_lib
+; Cell Name: matched_patch
+; View Name: emModel
+define matched_patch ( P1  ref=0 ) 
+parameters  Wm=0.7035945810262776  Lm=19.96929794249173 
+; MomCmpt model has node 0 as implicit reference. Ref node will be ignored and assumed to be grounded!
+em_data_name="full_patch_lib:matched_patch:emModel"
+MomCmpt:em_data  P1 \
+    name=em_data_name \
+    paramFile="" \
+    modelFile="C:/ADS/examples/microstrip_patch_em_optimization/workspace/full_patch_lib/matched_patch/em%Model/model.ndx" \
+    ModelReuse=1 \
+    ModelType="MOMMW" \
+    ExtrapolationMode="linear" \
+    EnforcePassivity=-1
+end matched_patch
+
+
+X=1.0
+Wm_final=0.73277
+Lm_final=20.58024
+matched_patch:DUT  N__0 Wm=Wm_final Lm=Lm_final 
+Port:PORT1  N__0 0 Num=1 Z=50 Ohm Noise=yes 
+S_Param:SP1 CalcS=yes CalcY=no CalcZ=no GroupDelayAperture=1e-4 FreqConversion=no FreqConversionPort=1 StatusLevel=2 CalcNoise=no SortNoise=0 BandwidthForNoise=1.0 Hz DevOpPtLevel=0 SPSS_WSP=yes \
+SweepVar="freq" SweepPlan="SP1_stim" OutputPlan="SP1_Output" 
+
+SweepPlan: SP1_stim Start=2 GHz Stop=3 GHz Step=.01 GHz 
+
+OutputPlan:SP1_Output \
+      Type="Output" \
+      UseEquationNestLevel=yes \
+      EquationNestLevel=2 \
+      UseSavedEquationNestLevel=yes \
+      SavedEquationNestLevel=2
+
+#load "python","LinearCollapse"
+Component Module="LinearCollapse" Type="ModelExtractor" NetworkRepresentation=2

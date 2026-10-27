@@ -1,0 +1,2 @@
+# In addition to the runtime MCP, pandas, numpy and matplotlib dependencies.
+scikit-rf>=1.0

@@ -1,0 +1,45 @@
+<!DOCTYPE Display>
+<Display>
+    <Current_Lpp name="cond:drawing"/>
+    <Lpp_Display_Order order="0">
+        <LPP name="default:drawing"/>
+        <LPP name="cond:drawing"/>
+        <LPP name="cond2:drawing"/>
+        <LPP name="resi:drawing"/>
+        <LPP name="diel:drawing"/>
+        <LPP name="diel2:drawing"/>
+        <LPP name="hole:drawing"/>
+        <LPP name="bond:drawing"/>
+        <LPP name="symbol:drawing"/>
+        <LPP name="text:drawing"/>
+        <LPP name="leads:drawing"/>
+        <LPP name="packages:drawing"/>
+        <LPP name="ports:drawing"/>
+        <LPP name="bound:drawing"/>
+        <LPP name="silk_screen:drawing"/>
+        <LPP name="silk_screen2:drawing"/>
+        <LPP name="case_dimensions:drawing"/>
+        <LPP name="pc1:drawing"/>
+        <LPP name="pc2:drawing"/>
+        <LPP name="pc3:drawing"/>
+        <LPP name="pc4:drawing"/>
+        <LPP name="pc5:drawing"/>
+        <LPP name="pc6:drawing"/>
+        <LPP name="pc7:drawing"/>
+        <LPP name="pc8:drawing"/>
+        <LPP name="pcvia1:drawing"/>
+        <LPP name="pcvia2:drawing"/>
+        <LPP name="pcvia3:drawing"/>
+        <LPP name="pcvia4:drawing"/>
+        <LPP name="pcvia5:drawing"/>
+        <LPP name="pcvia6:drawing"/>
+        <LPP name="pcvia7:drawing"/>
+        <LPP name="solder_mask:drawing"/>
+        <LPP name="IC_pin_number:drawing"/>
+        <LPP name="IC_pin1_marker:drawing"/>
+        <LPP name="hpeesof_region:drawing"/>
+        <LPP name="momentum_err:drawing"/>
+        <LPP name="momentum_box:drawing"/>
+        <LPP name="momentum_ref_offset:drawing"/>
+    </Lpp_Display_Order>
+</Display>

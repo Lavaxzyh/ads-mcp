@@ -17,10 +17,12 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ads_engine import AdsEngine, ensure_env, get_ads_install_dir, get_workroot
+from ads_engine import AdsEngine, ensure_env, get_ads_install_dir, get_workroot, get_state_file
 from momentum import MomentumRunner, inspect_setup
-from em_modeling import ConductorLayer, DielectricLayer, EmModeler, LayoutPort, LayoutShape
+from em_modeling import ConductorLayer, DielectricLayer, EmModeler, LayoutPort, LayoutShape, ViaLayer
 from session_state import SessionState, StateError
+from version import __version__
+from circuit_runner import CircuitRunner
 
 _HERE = Path(__file__).resolve().parent
 
@@ -41,17 +43,21 @@ and ads_configure_momentum_setup, or use an existing saved native EM Setup.
 Save/close the server workspace, open it in ADS GUI, call ads_list_gui_sessions and
 ads_inspect_momentum_setup, then ads_run_momentum and poll ads_get_sim_status.
 Close any workspace owned by this server with ads_close_workspace before
-using the GUI Momentum path. Geometry is supplied as explicit rectangles or
-polygons; arbitrary schematic/PDK artwork inference and RFPro/FEM execution
-are not provided."""
+using the GUI Momentum path. Native schematic artwork conversion is available
+through ads_generate_layout; explicit polygons remain available through
+ads_create_layout. Use ads_configure_em_model, reload the workspace, and solve
+Momentum before loading the native model in a circuit testbench. GUI circuit
+simulation/optimization requires backend=gui, a selected session and target
+schematic. RFPro/FEM and arbitrary PDK conversion are not provided."""
 
 mcp = FastMCP("ads-mcp", instructions=INSTRUCTIONS)
 # FastMCP does not expose the server version; report ours instead of the SDK's
-mcp._mcp_server.version = "0.3.0"
+mcp._mcp_server.version = __version__
 engine = AdsEngine()
-state = SessionState(Path(os.environ.get("ADS_MCP_STATE_FILE") or _HERE / "state" / "session_state.json"))
+state = SessionState(get_state_file())
 momentum = MomentumRunner(get_ads_install_dir() / "bin" / "ads-mcp.exe")
 em_modeler = EmModeler()
+circuit_runner = CircuitRunner()
 _workspace_dispatch_lock = threading.RLock()
 
 
@@ -304,7 +310,8 @@ def ads_generate_netlist(save: bool = True) -> dict[str, Any]:
 
 @mcp.tool()
 @_serialize_workspace
-def ads_run_simulation(output_dir: str = "") -> dict[str, Any]:
+def ads_run_simulation(output_dir: str = "", backend: str = "standalone", session_id: int | None = None,
+                       workspace: str = "", design: str = "", mode: str = "simulate", data_directory: str = "") -> dict[str, Any]:
     """Save the schematic, netlist it, and run hpeesofsim in the background.
 
     Returns a `task_id`; poll with ads_get_sim_status.  The result carries the
@@ -312,6 +319,16 @@ def ads_run_simulation(output_dir: str = "") -> dict[str, Any]:
     """
     try:
         _ensure_no_running_tasks()
+        if backend == "gui":
+            if data_directory:
+                raise ValueError("GUI uses workspace vendor-library search paths; data_directory is for standalone runs")
+            if engine.workspace_path is not None:
+                raise StateError("Close MCP-owned workspace before running in ADS GUI")
+            if mode not in {"simulate", "optimize"} or not session_id or not workspace or not design:
+                raise ValueError("GUI run requires session_id, workspace, schematic design, and simulate/optimize mode")
+            return _ok(**circuit_runner.start(state, session_id, workspace, design, mode))
+        if backend != "standalone" or mode != "simulate":
+            raise ValueError("Use backend=gui for native optimization; standalone defaults remain unchanged")
         ws = state.get("workspace_path")
         engine.save_schematic()
         netlist_result = engine.generate_netlist()
@@ -322,7 +339,7 @@ def ads_run_simulation(output_dir: str = "") -> dict[str, Any]:
 
         def _run() -> dict[str, Any]:
             try:
-                result = engine.run_simulation(out_dir, netlist_result["netlist"])
+                result = engine.run_simulation(out_dir, netlist_result["netlist"], data_directory=data_directory) if data_directory else engine.run_simulation(out_dir, netlist_result["netlist"])
                 state.transition("idle")
                 return result
             except Exception:
@@ -349,6 +366,8 @@ def ads_get_sim_status(task_id: str) -> dict[str, Any]:
         st = state.task_status(task_id)
         if st["kind"] == "momentum":
             st = momentum.poll(state, task_id, engine.validate_momentum_dataset)
+        elif st["kind"] == "gui_circuit":
+            st = circuit_runner.poll(state, task_id, engine._read_dataframe)
         st.pop("monitor", None)
         return _ok(**st)
     except KeyError as exc:
@@ -384,7 +403,7 @@ def _model_operation(lib: str, operation: str, **data) -> dict[str, Any]:
 @_serialize_workspace
 def ads_create_substrate(lib: str, name: str,
                          dielectrics: list[DielectricLayer], conductors: list[ConductorLayer],
-                         ground_bottom: bool = True) -> dict[str, Any]:
+                          ground_bottom: bool = True, vias: list[ViaLayer] | None = None) -> dict[str, Any]:
     """Create a parameterized planar substrate in the current local library.
 
     dielectrics are bottom-to-top, with height_mm, er and loss_tangent.
@@ -395,7 +414,8 @@ def ads_create_substrate(lib: str, name: str,
     are preserved. New libraries receive standard ADS layout technology.
     """
     return _model_operation(lib, "substrate", name=name,
-                            dielectrics=dielectrics, conductors=conductors, ground_bottom=ground_bottom)
+                             dielectrics=dielectrics, conductors=conductors, ground_bottom=ground_bottom,
+                             vias=vias or [])
 
 
 @mcp.tool()
@@ -512,12 +532,19 @@ def _last_dataset_from_tasks() -> str:
 
 @mcp.tool()
 def ads_export_touchstone(dataset: str = "", out_path: str = "") -> dict[str, Any]:
-    """Export the simulated S-parameters as a Touchstone .s2p file."""
+    """Export the full 1/N-port matrix to a matching .sNp file (50-ohm reference)."""
     try:
         ds_path = dataset.strip() or _last_dataset_from_tasks()
         if not ds_path:
             raise RuntimeError("no dataset available; run a simulation first")
-        out = out_path.strip() or str(Path(ds_path).with_suffix(".s2p"))
+        if out_path.strip():
+            out = out_path.strip()
+        else:
+            from sparameter_results import matrix_from_frame
+            with engine._op():
+                _, frame = engine._read_dataframe(ds_path)
+                _, matrix = matrix_from_frame(frame)
+            out = str(Path(ds_path).with_suffix(f".s{matrix.shape[1]}p"))
         return _ok(**engine.export_touchstone(ds_path, out))
     except Exception as exc:  # noqa: BLE001
         return _err(exc)
@@ -589,6 +616,9 @@ def ads_open_in_gui(workspace: str = "") -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         return _err(exc)
 
+
+from native_tools import register as _register_native_tools
+_register_native_tools(mcp, engine, state)
 
 if __name__ == "__main__":
     ensure_env()

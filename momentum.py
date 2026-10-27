@@ -20,6 +20,7 @@ import xml.etree.ElementTree as ET
 from collections import deque
 from pathlib import Path
 from typing import Any
+from version import __version__
 
 _MARKER = "ADS_MOMENTUM_JSON:"
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
@@ -100,9 +101,11 @@ def inspect_setup(workspace: str, setup_file: str, setup: str = "emSetup") -> di
         raise ValueError("disable reusePreviousResults for a fresh Momentum solve")
     plans = [p for p in main.findall("MomSimFreqTable/freqPlanMap/MomSimFreqTableDef")
              if p.findtext("enableFreq") == "True"]
-    if len(plans) != 1 or plans[0].findtext("typeFreq") != "1":
-        raise ValueError("exactly one enabled linear frequency plan is required")
-    plan = plans[0]
+    rf = [p for p in plans if p.findtext("typeFreq") == "1"]
+    dc = [p for p in plans if p.findtext("typeFreq") == "3" and float(p.findtext("startFreq", "nan")) == 0]
+    if len(rf) != 1 or len(dc) > 1 or len(rf) + len(dc) != len(plans):
+        raise ValueError("exactly one enabled linear frequency plan and optional discrete DC plan are required")
+    plan = rf[0]
 
     def frequency(tag: str) -> float:
         unit = plan.findtext(tag + "Unit", "").lower()
@@ -119,10 +122,13 @@ def inspect_setup(workspace: str, setup_file: str, setup: str = "emSetup") -> di
     sim_dir = _inside(ws / "simulation" / lib_dir.name / cell_dir.name / views[0].name / (setup + "_MoM"), ws)
     lock_name = hashlib.sha256(f"{lib}:{cell}:{view}:{setup}".encode("utf-8")).hexdigest()[:24] + ".json"
     run_lock = _inside(ws / ".ads-mcp" / "locks" / lock_name, ws)
+    frequency_info = {"start_hz": start, "stop_hz": stop, "step_hz": step, "points": points}
+    if dc:
+        frequency_info.update(points=points + 1, rf_points=points, include_dc=True)
     return {"workspace": str(ws), "setup_file": str(xml), "library_dir": str(lib_dir),
             "lib": lib, "cell": cell, "view": view, "setup": setup,
             "simulation_dir": str(sim_dir), "log": str(sim_dir / "proj.log"),
-            "frequency": {"start_hz": start, "stop_hz": stop, "step_hz": step, "points": points},
+            "frequency": frequency_info,
             "simulation_mode": "microwave",
             "requires_gui": True, "run_lock": str(run_lock), "existing_run_lock": run_lock.exists()}
 
@@ -167,7 +173,7 @@ class OfficialAdsClient:
             reader.start()
         try:
             self._request("initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
-                                        "clientInfo": {"name": "ads-mcp-momentum", "version": "0.3.0"}})
+                                        "clientInfo": {"name": "ads-mcp-momentum", "version": __version__}})
             self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
         except Exception:
             self.__exit__(None, None, None)
@@ -391,7 +397,7 @@ class MomentumRunner:
         elif time.time() - progress.get("last_activity_epoch", monitor["started_at_epoch"]) > 300:
             progress["attention_required"] = "The solver log has not changed for 5 minutes. Check ADS; no cancellation was sent."
         state.update_external_task(task_id, progress=progress)
-        failure = re.search(r"(?im)^\s*(?:ERROR\b|FATAL\b|Simulation (?:failed|aborted|terminated)\b).*$", text)
+        failure = re.search(r"(?im)^\s*(?:-+\s*)?(?:ERROR\b|FATAL\b|Simulation (?:failed|aborted|terminated)\b).*$", text)
         if failure:
             state.update_external_task(task_id, status="error", error=failure[0], progress=progress)
             # Leave the reservation: an error line alone does not prove that

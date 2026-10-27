@@ -1,7 +1,7 @@
 # Parameterized planar EM modeling
 
-v0.3.0 includes four parameterized construction tools alongside three native
-Momentum execution tools, for **32 MCP tools** in total.
+v0.4.0 retains the parameterized construction tools and native Momentum
+execution tools, for **49 MCP tools** in total. See [the native workflow tools](v040-tools.md).
 
 Construction uses the workspace opened by this MCP server. All geometry and
 substrates are saved before the workspace is handed to ADS GUI for Momentum
@@ -46,7 +46,7 @@ of this adapter. Touchstone export remains limited to two ports.
 Create/open the MCP workspace and a local design library first:
 
 ```python
-ads_create_workspace(path="C:/ADS/em_demo_wrk")
+ads_create_workspace(path="<WORKSPACE>")
 ads_create_library(name="em_demo_lib")
 
 ads_create_substrate(
@@ -75,7 +75,7 @@ ads_configure_momentum_setup(
 # Save the returned setup_file for execution.
 
 ads_close_workspace()
-ads_open_in_gui(workspace="C:/ADS/em_demo_wrk")
+ads_open_in_gui(workspace="<WORKSPACE>")
 ads_list_gui_sessions()
 # Select the discovered session for this workspace, then use
 # ads_run_momentum(session_id=..., workspace=..., setup_file=...).
@@ -109,7 +109,7 @@ so setting only the legacy field is insufficient. Completion also checks
 ## Complete command-line example
 
 ```bat
-.venv\Scripts\python.exe demo\build_momentum.py --workspace C:/ADS/em_demo_wrk --run
+.venv\Scripts\python.exe demo\build_momentum.py --workspace <NEW_WORKSPACE> --run
 ```
 
 This example creates a **new** workspace, builds the five-section microstrip

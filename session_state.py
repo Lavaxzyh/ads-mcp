@@ -70,7 +70,7 @@ class SessionState:
                 # In-process circuit workers cannot survive a server restart.
                 interrupted = False
                 for task in self._data["tasks"].values():
-                    if task.get("status") == "running" and task.get("kind") != "momentum":
+                    if task.get("status") == "running" and task.get("kind") not in {"momentum", "gui_circuit"}:
                         task.update(status="error", error="MCP server restarted; in-process task was interrupted")
                         interrupted = True
                 if interrupted and not any(t.get("status") == "running" for t in self._data["tasks"].values()):
@@ -158,6 +158,15 @@ class SessionState:
             if status != "running":
                 task.update(result=result, error=error, finished_at=time.strftime("%Y-%m-%dT%H:%M:%S"))
                 self._data["state"] = "idle" if status == "done" else "error"
+            self._save()
+
+    def record_optimizer_release(self, task_id: str, details: dict) -> None:
+        """Annotate a completed optimizer without reopening its terminal state."""
+        with self._lock:
+            task = self._data["tasks"][task_id]
+            if task["status"] != "done" or task["kind"] != "gui_circuit" or task["monitor"]["mode"] != "optimize":
+                raise StateError("Only a completed GUI optimizer can be released")
+            task["result"].update(copy.deepcopy(details), simulator_release_required=False)
             self._save()
 
     def submit(self, kind: str, fn: Callable[[], Any]) -> str:

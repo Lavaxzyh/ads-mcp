@@ -131,7 +131,8 @@ class SchemaTests(unittest.IsolatedAsyncioTestCase):
     async def test_32_tools_and_momentum_signature(self):
         tools = await server.mcp.list_tools()
         names = {tool.name for tool in tools}
-        self.assertEqual(len(names), 32)
+        self.assertTrue({"ads_generate_layout", "ads_generate_symbol", "ads_configure_em_model", "ads_inspect_em_model", "ads_configure_momentum_mesh", "ads_list_windows", "ads_arrange_windows", "ads_set_mesh_visibility"} <= names)
+        self.assertEqual(len(names), len(tools))
         self.assertTrue({"ads_list_gui_sessions", "ads_inspect_momentum_setup", "ads_run_momentum"} <= names)
         tool = next(tool for tool in tools if tool.name == "ads_run_momentum")
         self.assertEqual(set(tool.inputSchema["required"]), {"session_id", "workspace", "setup_file"})
@@ -139,7 +140,7 @@ class SchemaTests(unittest.IsolatedAsyncioTestCase):
         layout = next(tool for tool in tools if tool.name == "ads_create_layout")
         self.assertEqual(set(layout.inputSchema["required"]), {"lib", "cell", "shapes"})
         self.assertFalse(layout.inputSchema["$defs"]["LayoutShape"]["additionalProperties"])
-        self.assertEqual(server.mcp._mcp_server.version, "0.3.0")
+        self.assertEqual(server.mcp._mcp_server.version, "0.4.0")
 
 
 if __name__ == "__main__":

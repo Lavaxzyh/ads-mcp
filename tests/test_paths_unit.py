@@ -54,6 +54,17 @@ class PathTests(unittest.TestCase):
                 (Path.home() / "ads-path-unit-output").resolve(),
             )
 
+    def test_default_state_uses_output_root_without_creating_directories(self):
+        with patch.dict(os.environ, {"ADS_MCP_STATE_FILE":"", "ADS_MCP_WORKROOT":str(self.root / "output")}):
+            self.assertEqual(ads_engine.get_state_file(), self.root / "output" / ".ads-mcp" / "session_state.json")
+        self.assertFalse((self.root / "output").exists())
+
+    def test_explicit_state_path_overrides_output_root(self):
+        target = self.root / "tasks" / "custom.json"
+        with patch.dict(os.environ, {"ADS_MCP_STATE_FILE":str(target)}):
+            self.assertEqual(ads_engine.get_state_file(), target)
+        self.assertFalse(target.parent.exists())
+
     def test_ensure_env_validates_and_normalizes_installation(self):
         install = self.root / "ADS"
         (install / "bin").mkdir(parents=True)

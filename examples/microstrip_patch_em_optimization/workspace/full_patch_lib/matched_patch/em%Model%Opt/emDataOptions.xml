@@ -1,0 +1,10 @@
+<emDataViewOptions>
+  <version major="1" minor="2"/>
+  <Options enforcePassivity="DuringExtrapolation" extrapolationMode="Linear" portTerminalPinsNetlistMode="Shorted" symbolNetlistMode="All pins"/>
+  <cellParameters useInterpolation="no">
+    <parameters>
+      <cellParameter delta="0.0703595" name="Wm" resolution="1e-05"/>
+      <cellParameter delta="1.99693" name="Lm" resolution="1e-05"/>
+    </parameters>
+  </cellParameters>
+</emDataViewOptions>

@@ -1,0 +1,8 @@
+; Top Design: "full_patch_lib:matched_patch:schematic"
+; Netlisted using Hierarchy Policy: "Standard"
+
+Options ResourceUsage=yes UseNutmegFormat=no EnableOptim=no TopDesignName="full_patch_lib:matched_patch:schematic" DcopOutputNodeVoltages=yes DcopOutputPinCurrents=yes DcopOutputAllSweepPoints=no DcopOutputDcopType=0
+model MSub1 MSUB H=1.6 mm Er=4.4 Mur=1 Cond=5.8e7 Hu=1e+33 mm T=35 um TanD=0.02 Rough=0 mm DielectricLossModel=1 FreqForEpsrTanD=1.0 GHz LowFreqForTanD=1.0 kHz HighFreqForTanD=1.0 THz RoughnessModel=2 
+MLIN2:FEED50  P1 N__2 Subst="MSub1" W=3.044740 mm L=8.566670 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MLIN2:MATCH  N__2 N__3 Subst="MSub1" W=Wm*1 mm L=Lm*1 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MLOC2:PATCH  N__3 Subst="MSub1" W=25 mm L=30 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 

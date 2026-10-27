@@ -1,0 +1,24 @@
+
+hpeesofsim (*) 650.shp Jul 29 2026, MINT version 5
+    (64-bit windows built: Wed Jul 29, 2026 11:10:28 +0000)
+
+***** Simulation started at Tue Oct 27 01:42:06 2026
+      Running on host: <HOST>
+      In Directory: "C:/ADS/examples/microstrip_patch_em_optimization/workspace\data"
+      Process ID: 167000
+
+
+SP SP1[1] <full_patch_lib:full_em_final_tb:schematic>   freq=(2 GHz->3 GHz)
+
+
+Resource usage:
+    Total CPU time            =     0.70 seconds.
+    Simulation stopwatch time =     0.10 seconds.
+    Total stopwatch time      =     0.83 seconds.
+
+    Memory used:  125 MBytes
+
+    Max threads used:  27
+        (NOTE: max threads includes very-low-CPU-usage support threads,
+         as well as high-CPU-usage computational threads.)
+

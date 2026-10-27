@@ -1,0 +1,12 @@
+{
+  "Wm_mm": 0.7327668436168027,
+  "Lm_mm": 20.580242031036086,
+  "goal_db": -40,
+  "optimization_frequency_ghz": 2.4,
+  "summary": {
+    "InitialEF": 0.11632807791917739,
+    "FinalEF": 0.0,
+    "NumIters": 1.0,
+    "NumFunEvals": 7.0
+  }
+}

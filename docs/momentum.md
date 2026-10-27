@@ -11,10 +11,11 @@ the system `ProgramFiles/Keysight/ADS2027` default. The GUI bridge and circuit
 tools use the same installation setting. `ADS_MCP_WORKROOT` controls circuit
 example outputs; it does not change the existing workspace passed to Momentum.
 
-v0.3.0 also provides four [planar EM modeling tools](em-modeling.md)
+v0.4.0 also provides four [planar EM modeling tools](em-modeling.md)
 to create substrates, layouts, ports and setups. Build and save the project in
 the MCP workspace, close it, then open it in ADS GUI for this execution flow.
-The version contains 32 MCP tools in total, including seven added since v0.2.0.
+The version contains 49 MCP tools in total, including the native Layout,
+emModel, GUI-window and result-comparison tools documented in [v040-tools.md](v040-tools.md).
 
 ## Prepare the project
 
@@ -23,7 +24,7 @@ The version contains 32 MCP tools in total, including seven added since v0.2.0.
 2. Open the workspace in the ADS GUI. Use a library inside the workspace,
    with simple library/cell/view names (letters, digits and underscores).
 3. Use native calculation type `5`, `SimSetupOverview/simulator=0` (microwave),
-   and one enabled linear sweep. This is
+   and one enabled linear RF sweep, optionally with a separate discrete DC point. This is
    the saved configuration tested with the Momentum microwave solver on ADS 2027.
    Other native calculation types and nonlinear/multiple sweeps are rejected.
 4. Enable dataset output, disable reuse of previous results, and use local,
@@ -43,14 +44,14 @@ ads_list_gui_sessions()
 # Select the returned session whose workspace_path is the intended project.
 
 ads_inspect_momentum_setup(
-    workspace="C:/ADS/lpf_wrk",
-    setup_file="C:/ADS/lpf_wrk/si_lpf_lib/lpf5o/em%Setup/emStateFile.xml",
+    workspace="<WORKSPACE>",
+    setup_file="<SETUP_XML>",
 )
 
 ads_run_momentum(
     session_id=12345,  # use a discovered ID, not this placeholder
-    workspace="C:/ADS/lpf_wrk",
-    setup_file="C:/ADS/lpf_wrk/si_lpf_lib/lpf5o/em%Setup/emStateFile.xml",
+    workspace="<WORKSPACE>",
+    setup_file="<SETUP_XML>",
 )
 # -> task_id
 
@@ -92,14 +93,14 @@ The live test uses **0.05–4.00 GHz, 396 points, 0.01 GHz step**. These are exa
 settings, not hard-coded limits. Dataset summaries select an S-parameter
 varblock (`data` for Momentum, commonly `SP1.SP` for circuit simulation) and
 support single, unique frequency axes. Multidimensional sweeps must be selected
-or reduced before result processing. Touchstone export supports two ports and
-assumes 50-ohm reference impedance.
+or reduced before result processing. Touchstone export supports complete N-port
+matrices, requires the matching `.sNp` extension, and assumes 50-ohm reference impedance.
 
 ## Restart, uncertain dispatch and recovery
 
 Momentum executes in ADS, independently of the MCP server. Use one MCP server
 per state file. Keep the same state JSON file (default
-`state/session_state.json`, or set `ADS_MCP_STATE_FILE`)
+`<USER_OUTPUT>/.ads-mcp/session_state.json`, or set `ADS_MCP_STATE_FILE`)
 and continue polling the same task ID after restarting the server. Monitoring
 does not redispatch a run. Interrupted in-process circuit tasks are reported
 as errors on restart; they cannot be resumed this way.
@@ -127,7 +128,7 @@ task. Removing the reservation is a recovery action, not cancellation.
 Run the demo using the same Python environment as the MCP server:
 
 ```bat
-.venv\Scripts\python.exe demo\run_momentum.py --workspace C:/ADS/lpf_wrk --setup-file C:/ADS/lpf_wrk/si_lpf_lib/lpf5o/em%Setup/emStateFile.xml --session-id 12345 --state-file C:/ADS/lpf_wrk/mcp_state.json
+.venv\Scripts\python.exe demo\run_momentum.py --workspace <WORKSPACE> --setup-file <SETUP_XML> --session-id 12345 --state-file <STATE_JSON>
 ```
 
 Add `--resume-task momentum_<returned-id>` with the same state file to monitor
@@ -136,7 +137,7 @@ Touchstone output only after verified completion.
 
 ## 本版能力边界
 
-v0.3.0 包含 32 个工具，较 v0.2.0 新增四个平面建模工具和三个求解工具。
+v0.4.0 包含 49 个工具，新增原生 Layout、emModel、GUI 窗口和结果比较工具。
 会话发现、配置检查和启动三个求解工具继续
 复用状态查询、数据读取、绘图和 Touchstone 导出。
 

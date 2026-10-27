@@ -1,0 +1,5 @@
+jobName=EmPpMsgs
+jobType=emprep
+designName=full_patch_lib:final_geometry:layout
+ruleFilePath=
+addInfo="EM preprocessor messages displayed as DRC errors"

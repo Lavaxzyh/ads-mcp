@@ -1,0 +1,85 @@
+{
+  "variant": "lumped",
+  "LP_nH": 11.4,
+  "band_GHz": [
+    1.3875,
+    1.4125
+  ],
+  "band_points": 51,
+  "EM_solver_RF_grid_MHz": 1,
+  "circuit_grid_MHz": 0.5,
+  "endpoints_and_half_MHz_interpolated": true,
+  "center_phase_difference_deg": 179.94171630015356,
+  "phase_error_deg": [
+    -2.5511071565472605,
+    2.0446481972039408
+  ],
+  "worst_return_dB": -27.335635464252412,
+  "worst_IL_dB": 0.3524165643471016,
+  "mesh40_center_deg": 179.07559524495372,
+  "mesh80_minus40_center_deg": 0.8661210551998408,
+  "center_states": {
+    "forward": {
+      "cell": "rtps180_final_forward",
+      "center": {
+        "S11_dB": -39.06709312884838,
+        "S22_dB": -38.98043467830105,
+        "S21_dB": -0.24971761452859817,
+        "phase21_deg": -179.66824815648255
+      },
+      "band_1p37_1p43": {
+        "worst_return_dB": -20.281273652120518,
+        "worst_insertion_loss_dB": 0.31334843196248807
+      },
+      "dc": {
+        "VBIAS2.i": -0.009126801604725987,
+        "VBIAS1.i": -0.00912680181934689
+      }
+    },
+    "reverse": {
+      "cell": "rtps180_final_reverse",
+      "center": {
+        "S11_dB": -42.601745476626924,
+        "S22_dB": -42.62380827480986,
+        "S21_dB": -0.3408068786821251,
+        "phase21_deg": 0.39003554336390545
+      },
+      "band_1p37_1p43": {
+        "worst_return_dB": -27.06600131350644,
+        "worst_insertion_loss_dB": 0.3698105925481322
+      },
+      "dc": {
+        "VBIAS2.i": 1.5607518545632183e-08,
+        "VBIAS1.i": 1.5607518369067603e-08
+      }
+    }
+  },
+  "isolation": [
+    {
+      "variant": "lumped",
+      "state": "forward",
+      "center_max_RF_to_bias_dB": -75.37526588529124,
+      "band_max_RF_to_bias_dB": -74.96939828513301,
+      "band_sampled_GHz": [
+        1.388,
+        1.412
+      ],
+      "RF_bias_reference_Ohm": 50,
+      "dc_feed_instrument_L_H": 1,
+      "RF_instrument_block_C_uF": 1
+    },
+    {
+      "variant": "lumped",
+      "state": "reverse",
+      "center_max_RF_to_bias_dB": -57.044012696438465,
+      "band_max_RF_to_bias_dB": -56.97356000123159,
+      "band_sampled_GHz": [
+        1.388,
+        1.412
+      ],
+      "RF_bias_reference_Ohm": 50,
+      "dc_feed_instrument_L_H": 1,
+      "RF_instrument_block_C_uF": 1
+    }
+  ]
+}

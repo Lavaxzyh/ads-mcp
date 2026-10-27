@@ -39,7 +39,7 @@ class ResultsTests(unittest.TestCase):
         df["S[3,1]"] = 0
         engine = AdsEngine()
         with patch.object(engine, "_read_dataframe", return_value=(["data"], df)):
-            with self.assertRaisesRegex(ValueError, "two-port"):
+            with self.assertRaisesRegex(ValueError, "Incomplete S parameter matrix"):
                 engine.export_touchstone("unused.ds", "unused.s2p")
 
     def test_momentum_grid_rejects_same_count_with_different_frequencies(self):

@@ -1,0 +1,176 @@
+{
+  "full_em_initial": {
+    "dataset": "reference_results/historical\\data\\full_em_initial.ds",
+    "points": 101,
+    "minimum": {
+      "frequency_ghz": 2.4,
+      "S11_db": -26.35723924464046
+    },
+    "at_2p4GHz": {
+      "S11_db": -26.35723924464046,
+      "Zin_real_ohm": 46.00000462213915,
+      "Zin_imag_ohm": -2.309527628948707
+    }
+  },
+  "full_em_final": {
+    "dataset": "C:/ADS/examples/microstrip_patch_em_optimization/workspace\\data\\full_em_final_realized\\full_em_final_tb.ds",
+    "points": 101,
+    "minimum": {
+      "frequency_ghz": 2.4,
+      "S11_db": -48.315156323494946
+    },
+    "at_2p4GHz": {
+      "S11_db": -48.315156323494946,
+      "Zin_real_ohm": 50.25864612303721,
+      "Zin_imag_ohm": -0.28506557337423966
+    }
+  },
+  "initial_native_model_max_complex_difference": 9.930136612989092e-16,
+  "final_realized_vs_optimizer_values_max_complex_difference": 0.0,
+  "optimizer": {
+    "InitialEF": 0.11632807791917739,
+    "FinalEF": 0.0,
+    "NumIters": 1.0,
+    "NumFunEvals": 7.0
+  },
+  "optimized_parameters": {
+    "Wm_mm": 0.7327668436168027,
+    "Lm_mm": 20.580242031036086,
+    "goal_db": -40,
+    "optimization_frequency_ghz": 2.4,
+    "summary": {
+      "InitialEF": 0.11632807791917739,
+      "FinalEF": 0.0,
+      "NumIters": 1.0,
+      "NumFunEvals": 7.0
+    }
+  },
+  "realized_geometry": {
+    "Wm_mm": 0.73277,
+    "Lm_mm": 20.58024,
+    "parameter_resolution_mm": 1e-05,
+    "parts": [
+      {
+        "name": "FEED50",
+        "bbox": "BoxF(lower_left=PointF(0.0, -1.52237), upper_right=PointF(8.56667, 1.52237))",
+        "pins": [
+          {
+            "n": 2,
+            "x": 8.56667,
+            "y": 0.0
+          },
+          {
+            "n": 1,
+            "x": 0.0,
+            "y": 0.0
+          }
+        ]
+      },
+      {
+        "name": "MATCH",
+        "bbox": "BoxF(lower_left=PointF(8.56667, -0.366385), upper_right=PointF(29.14691, 0.366385))",
+        "pins": [
+          {
+            "n": 2,
+            "x": 29.14691,
+            "y": 0.0
+          },
+          {
+            "n": 1,
+            "x": 8.56667,
+            "y": 0.0
+          }
+        ]
+      },
+      {
+        "name": "PATCH",
+        "bbox": "BoxF(lower_left=PointF(29.14691, -12.5), upper_right=PointF(59.14691, 12.5))",
+        "pins": [
+          {
+            "n": 1,
+            "x": 29.14691,
+            "y": 0.0
+          }
+        ]
+      }
+    ],
+    "junctions_connected": true
+  },
+  "em_database_samples": {
+    "em%Model": [
+      {
+        "sample": "data.000",
+        "parameters": {
+          "Wm": 0.7035945810262776,
+          "Lm": 19.96929794249173
+        }
+      },
+      {
+        "sample": "data.001",
+        "parameters": {
+          "Wm": 0.73277,
+          "Lm": 20.58024
+        }
+      }
+    ],
+    "em%Model%Opt": [
+      {
+        "sample": "data.000",
+        "parameters": {
+          "Wm": 0.7035945810262776,
+          "Lm": 19.96929794249173
+        }
+      },
+      {
+        "sample": "data.001",
+        "parameters": {
+          "Wm": 0.8,
+          "Lm": 18.0
+        }
+      },
+      {
+        "sample": "data.002",
+        "parameters": {
+          "Wm": 0.70359,
+          "Lm": 19.96928
+        }
+      },
+      {
+        "sample": "data.003",
+        "parameters": {
+          "Wm": 0.70361,
+          "Lm": 19.9693
+        }
+      },
+      {
+        "sample": "data.004",
+        "parameters": {
+          "Wm": 0.73277,
+          "Lm": 20.58024
+        }
+      },
+      {
+        "sample": "data.005",
+        "parameters": {
+          "Wm": 0.79207,
+          "Lm": 21.67978
+        }
+      },
+      {
+        "sample": "data.006",
+        "parameters": {
+          "Wm": 0.73277,
+          "Lm": 20.58022
+        }
+      },
+      {
+        "sample": "data.007",
+        "parameters": {
+          "Wm": 0.73278,
+          "Lm": 20.58024
+        }
+      }
+    ]
+  },
+  "solver_warning_lines": []
+}

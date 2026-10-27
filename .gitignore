@@ -1,5 +1,4 @@
 .venv/
-state/
 __pycache__/
 *.pyc
 *.ds
@@ -11,3 +10,7 @@ scratch/
 de_sim.cfg
 hpeesofsim.cfg
 .ads-mcp/
+state/
+*.cdslck
+*.lck
+*.lcf

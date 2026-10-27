@@ -1,0 +1,104 @@
+; Top Design: "meander14_lib:rtps180_compact80:schematic"
+; Netlisted using Hierarchy Policy: "Standard"
+
+Options ResourceUsage=yes UseNutmegFormat=no EnableOptim=no TopDesignName="meander14_lib:rtps180_compact80:schematic" DcopOutputNodeVoltages=yes DcopOutputPinCurrents=yes DcopOutputAllSweepPoints=no DcopOutputDcopType=0
+
+X=1.0
+Wv=1.422
+Wh=2.382
+Wf=1.37743
+Lc=5
+Lh=19.66
+Lv=8.787
+Lb=3
+Le=4.5
+Fstart=1.2
+Fstop=1.6
+Fstep=0.001
+model MSub1 MSUB H=0.5 mm Er=2.55 Mur=1 Cond=5.8e7 Hu=3.93701e+34 mil T=17 um TanD=0.0012 Rough=0 mil DielectricLossModel=1 FreqForEpsrTanD=1.0 GHz LowFreqForTanD=1.0 kHz HighFreqForTanD=1.0 THz RoughnessModel=2 
+MTEE_ADS:Tee1  N__60 N__62 N__61 Subst="MSub1" W1=Wf mm W2=Wh mm W3=Wv mm 
+MLIN2:TL3  N__64 N__63 Subst="MSub1" W=Wv mm L=Lv mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MSOBND:Bend2  N__65 N__66 Subst="MSub1" W=Wv mm 
+MLIN2:TL4  N__67 N__65 Subst="MSub1" W=Wv mm L=Lv mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MSOBND:Bend3  N__68 N__63 Subst="MSub1" W=Wv mm 
+MLIN2:TL5  N__68 N__66 Subst="MSub1" W=Wv mm L=Lb mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL6  N__62 N__69 Subst="MSub1" W=Wh mm L=Lh mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MSOBND:Bend4  N__70 N__64 Subst="MSub1" W=Wv mm 
+MSOBND:Bend5  N__67 N__71 Subst="MSub1" W=Wv mm 
+MLIN2:TL7  N__61 N__70 Subst="MSub1" W=Wv mm L=Le mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL8  N__71 N__72 Subst="MSub1" W=Wv mm L=Le mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MTEE_ADS:Tee2  N__73 N__74 N__72 Subst="MSub1" W1=Wh mm W2=Wf mm W3=Wv mm 
+MLIN2:TL9  N__73 N__75 Subst="MSub1" W=Wh mm L=Lh mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MTEE_ADS:Tee3  N__76 N__78 N__77 Subst="MSub1" W1=Wh mm W2=Wf mm W3=Wv mm 
+MLIN2:TL10  N__75 N__79 Subst="MSub1" W=Wh mm L=Lh mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL11  N__69 N__76 Subst="MSub1" W=Wh mm L=Lh mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MTEE_ADS:Tee4  N__80 N__79 N__81 Subst="MSub1" W1=Wf mm W2=Wh mm W3=Wv mm 
+MLIN2:TL12  N__82 N__77 Subst="MSub1" W=Wv mm L=Le mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL13  N__81 N__83 Subst="MSub1" W=Wv mm L=Le mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL14  N__85 N__84 Subst="MSub1" W=Wv mm L=Lb mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL15  N__87 N__86 Subst="MSub1" W=Wv mm L=Lv mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL16  N__89 N__88 Subst="MSub1" W=Wv mm L=Lv mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MSOBND:Bend6  N__86 N__84 Subst="MSub1" W=Wv mm 
+MSOBND:Bend7  N__85 N__88 Subst="MSub1" W=Wv mm 
+MSOBND:Bend8  N__83 N__89 Subst="MSub1" W=Wv mm 
+MSOBND:Bend9  N__87 N__82 Subst="MSub1" W=Wv mm 
+MLIN2:TL17  RF_IN N__60 Subst="MSub1" W=Wf mm L=Lc mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL18  RF_OUT N__74 Subst="MSub1" W=Wf mm L=Lc mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL19  N__78 A1_C1_A Subst="MSub1" W=Wf mm L=Lc mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MLIN2:TL20  N__80 A2_C1_A Subst="MSub1" W=Wf mm L=Lc mm Wall1=1.0E+30 mil Wall2=1.0E+30 mil Mod=1 
+MGAP:A1_C1_GAP  A1_C1_A A1_C1_B Subst="MSub1" W=1.37743 mm S=0.5 mm 
+MLIN2:A1_RF_LEAD  A1_C1_B N__36 Subst="MSub1" W=1.37743 mm L=0.6 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MTEE:A1_LP_TEE  N__36 N__37 N__42 Subst="MSub1" W1=1.37743 mm W2=1.37743 mm W3=1.37743 mm 
+MLIN2:A1_RF_MID  N__37 N__38 Subst="MSub1" W=1.37743 mm L=0.5 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MTEE:A1_RF_TEE  N__39 N__38 N__44 Subst="MSub1" W1=1.37743 mm W2=1.37743 mm W3=2.184 mm 
+MSTEP:A1_D_STEP  N__39 N__40 Subst="MSub1" W1=1.37743 mm W2=1.8 mm 
+MLIN2:A1_D_ANODE_PAD  N__40 A1_D_A Subst="MSub1" W=1.8 mm L=1.0 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A1_D_GAP  A1_D_A A1_D_B Subst="MSub1" W=1.8 mm S=2.5 mm 
+MLIN2:A1_D_CATHODE_PAD  A1_D_B N__41 Subst="MSub1" W=1.8 mm L=1.0 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+VIAGND:A1_D_VIA  N__41 Subst="MSub1" D=.3 mm T=.025 mm Rho=1.0 W=1.8 mm 
+MLIN2:A1_LP_FEED  N__42 A1_LP_A Subst="MSub1" W=1.37743 mm L=0.8 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A1_LP_GAP  A1_LP_A A1_LP_B Subst="MSub1" W=1.37743 mm S=0.8 mm 
+MLIN2:A1_LP_LINK  A1_LP_B N__34 Subst="MSub1" W=1.37743 mm L=0.5 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A1_C3_GAP  A1_C3_A A1_C3_B Subst="MSub1" W=1.37743 mm S=0.5 mm 
+MLIN2:A1_C3_GND_LINE  A1_C3_B N__43 Subst="MSub1" W=1.37743 mm L=0.5 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+VIAGND:A1_LP_VIA  N__43 Subst="MSub1" D=.3 mm T=.025 mm Rho=1.0 W=1.37743 mm 
+MLIN2:A1_CHOKE_TOP  N__44 A1_CHOKE_A Subst="MSub1" W=2.184 mm L=2.349 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A1_CHOKE_GAP  A1_CHOKE_A A1_CHOKE_B Subst="MSub1" W=2.184 mm S=0.8 mm 
+MLIN2:A1_CHOKE_BOTTOM  A1_CHOKE_B N__45 Subst="MSub1" W=2.184 mm L=3.254 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MTEE:A1_BIAS_TEE  N__46 N__48 N__45 Subst="MSub1" W1=1.37743 mm W2=1.37743 mm W3=2.184 mm 
+MLIN2:A1_C2_BUS  N__46 A1_C2_A Subst="MSub1" W=1.37743 mm L=1.239 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A1_C2_GAP  A1_C2_A A1_C2_B Subst="MSub1" W=1.37743 mm S=0.5 mm 
+MLIN2:A1_C2_GND_LINE  A1_C2_B N__47 Subst="MSub1" W=1.37743 mm L=0.302 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+VIAGND:A1_BIAS_VIA  N__47 Subst="MSub1" D=.3 mm T=.025 mm Rho=1.0 W=1.37743 mm 
+MLIN2:A1_R_BUS  N__48 A1_R_A Subst="MSub1" W=1.37743 mm L=2.8 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A1_R_GAP  A1_R_A A1_R_B Subst="MSub1" W=1.37743 mm S=0.7 mm 
+MLIN2:A1_DC_PAD  A1_R_B BIAS1 Subst="MSub1" W=1.37743 mm L=3.0 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A2_C1_GAP  A2_C1_A A2_C1_B Subst="MSub1" W=1.37743 mm S=0.5 mm 
+MLIN2:A2_RF_LEAD  A2_C1_B N__49 Subst="MSub1" W=1.37743 mm L=0.6 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MTEE:A2_LP_TEE  N__50 N__49 N__55 Subst="MSub1" W1=1.37743 mm W2=1.37743 mm W3=1.37743 mm 
+MLIN2:A2_RF_MID  N__50 N__51 Subst="MSub1" W=1.37743 mm L=0.5 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MTEE:A2_RF_TEE  N__51 N__52 N__57 Subst="MSub1" W1=1.37743 mm W2=1.37743 mm W3=2.184 mm 
+MSTEP:A2_D_STEP  N__52 N__53 Subst="MSub1" W1=1.37743 mm W2=1.8 mm 
+MLIN2:A2_D_ANODE_PAD  N__53 A2_D_A Subst="MSub1" W=1.8 mm L=1.0 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A2_D_GAP  A2_D_A A2_D_B Subst="MSub1" W=1.8 mm S=2.5 mm 
+MLIN2:A2_D_CATHODE_PAD  A2_D_B N__54 Subst="MSub1" W=1.8 mm L=1.0 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+VIAGND:A2_D_VIA  N__54 Subst="MSub1" D=.3 mm T=.025 mm Rho=1.0 W=1.8 mm 
+MLIN2:A2_LP_FEED  N__55 A2_LP_A Subst="MSub1" W=1.37743 mm L=0.8 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A2_LP_GAP  A2_LP_A A2_LP_B Subst="MSub1" W=1.37743 mm S=0.8 mm 
+MLIN2:A2_LP_LINK  A2_LP_B N__35 Subst="MSub1" W=1.37743 mm L=0.5 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A2_C3_GAP  A2_C3_A A2_C3_B Subst="MSub1" W=1.37743 mm S=0.5 mm 
+MLIN2:A2_C3_GND_LINE  A2_C3_B N__56 Subst="MSub1" W=1.37743 mm L=0.5 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+VIAGND:A2_LP_VIA  N__56 Subst="MSub1" D=.3 mm T=.025 mm Rho=1.0 W=1.37743 mm 
+MLIN2:A2_CHOKE_TOP  N__57 A2_CHOKE_A Subst="MSub1" W=2.184 mm L=2.349 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A2_CHOKE_GAP  A2_CHOKE_A A2_CHOKE_B Subst="MSub1" W=2.184 mm S=0.8 mm 
+MLIN2:A2_CHOKE_BOTTOM  A2_CHOKE_B N__58 Subst="MSub1" W=2.184 mm L=3.254 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MTEE:A2_BIAS_TEE  N__33 N__59 N__58 Subst="MSub1" W1=1.37743 mm W2=1.37743 mm W3=2.184 mm 
+MLIN2:A2_C2_BUS  N__59 A2_C2_A Subst="MSub1" W=1.37743 mm L=1.239 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A2_C2_GAP  A2_C2_A A2_C2_B Subst="MSub1" W=1.37743 mm S=0.5 mm 
+MLIN2:A2_C2_GND_LINE  A2_C2_B N__32 Subst="MSub1" W=1.37743 mm L=0.302 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+VIAGND:A2_BIAS_VIA  N__32 Subst="MSub1" D=.3 mm T=.025 mm Rho=1.0 W=1.37743 mm 
+MLIN2:A2_R_BUS  N__33 A2_R_A Subst="MSub1" W=1.37743 mm L=2.8 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MGAP:A2_R_GAP  A2_R_A A2_R_B Subst="MSub1" W=1.37743 mm S=0.7 mm 
+MLIN2:A2_DC_PAD  A2_R_B BIAS2 Subst="MSub1" W=1.37743 mm L=3.0 mm Wall1=2.5000000000000002e+28 mm Wall2=2.5000000000000002e+28 mm Mod=1 
+MSOBND:A1_C3_BEND  N__34 A1_C3_A Subst="MSub1" W=1.377430 mm 
+MSOBND:A2_C3_BEND  N__35 A2_C3_A Subst="MSub1" W=1.377430 mm 

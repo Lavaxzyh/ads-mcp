@@ -37,6 +37,15 @@ class ConductorLayer(ModelInput):
     conductivity_s_per_m: Positive | None = None  # None = perfect conductor
 
 
+class ViaLayer(ModelInput):
+    """Conductor via between substrate interfaces; plating dimensions in microns."""
+    layer: Name = "hole"
+    lower_interface: Annotated[int, Field(strict=True, ge=0)] = 0
+    upper_interface: Annotated[int, Field(strict=True, ge=1)] = 1
+    conductor_index: Annotated[int, Field(strict=True, ge=0)] = 0
+    plating_thickness_um: Positive | None = None
+
+
 class LayoutShape(ModelInput):
     """Rectangle corner pair or simple polygon vertices; coordinates in mm."""
     kind: Literal["rectangle", "polygon"]
@@ -184,12 +193,21 @@ def _model_in_ads(a):
             item.thickness_expr = str(spec["thickness_um"])
             item.thickness_unit = subst.Unit.MICRON
             item.sheet = spec["thickness_um"] == 0
+        for spec in a.get("vias", []):
+            item = stack.insert_conductor_via(spec["lower_interface"] + offset, spec["upper_interface"] + offset)
+            item.layer_number = layer(spec["layer"]).layer
+            item.material_name = conductor_names[spec["conductor_index"]]
+            if spec.get("plating_thickness_um") is not None:
+                item.is_plating_enabled = True
+                item.plating_dielectric_material_name = "AIR"
+                item.plating_thickness_expr = str(spec["plating_thickness_um"])
+                item.plating_thickness_unit = subst.Unit.MICRON
         stack.save_substrate()
         if sum(not m.is_infinite_material for m in stack.materials) != len(a["dielectrics"]):
             raise RuntimeError("ADS stack finite-layer count differs from the requested dielectric count")
         return {"substrate": a["lib"]+":"+name, "materials_file": str(matfile),
                 "dielectric_count": len(a["dielectrics"]), "conductor_count": len(stack.layers),
-                "ground_bottom": a["ground_bottom"]}
+                "ground_bottom": a["ground_bottom"], "via_count": len(a.get("vias", []))}
 
     cell_name, view = a["cell"], a["view"]
     cell = lib.cell(cell_name) if lib.cell_exists(cell_name) else None
@@ -430,6 +448,10 @@ class EmModeler:
             if any(c["interface"] > len(ds) for c in cs) or len({c["layer"] for c in cs}) != len(cs):
                 raise ValueError("conductor interfaces must be within the stack and layer names must be unique")
             data.update(dielectrics=ds, conductors=cs)
+            vias = [ViaLayer.model_validate(x).model_dump(mode="json") for x in data.get("vias", [])]
+            if any(not v["lower_interface"] < v["upper_interface"] <= len(ds) or v["conductor_index"] >= len(cs) for v in vias):
+                raise ValueError("Via interfaces/conductor index are outside the substrate stack")
+            data["vias"] = vias
         elif operation == "layout":
             data["shapes"] = [LayoutShape.model_validate(x).model_dump(mode="json") for x in data["shapes"]]
             if not 1 <= len(data["shapes"]) <= 1000 or sum(len(s["points_mm"]) for s in data["shapes"]) > 10000:

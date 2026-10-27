@@ -1,0 +1,46 @@
+License checkout took 0.007 sec
+License checkout took 0.008 sec
+Momentum MomEngine_64 2027.00.303 (*) built: Jul 22 2026
+Copyright  1992 - 2026 Keysight Technologies
+Running on: <HOST>
+Simulation started on: Sun Oct 18 02:29:32 2026
+Simulation Mode: uW
+Substrate valid
+Automatically determined a snap distance of
+0.000053 mm for layout healing.
+Layout simplification started
+.........|.........|.........|.........| 
+Layout simplification finished
+Generating mesh at 3 GHz...
+S-parameter simulation
+S-parameter simulation started
+...initializing
+...extracting layout
+...analyzing ports
+...reducing mesh
+Solver selection: direct dense matrix solver
+Using multi-threading (10 threads)
+Matrix size: 1054 (reduced: 1038)
+Simulation temperature: 298.15 K
+Frequency sweep started
+Simulation frequency [1] = 2.4 GHz
+...loading Green functions
+...creating Basis sections
+...allocating interaction matrix
+...loading surface impedances
+.........|.........|.........|.........| 
+...loading interaction matrix
+.........|.........|.........|.........| 
+...solving interaction matrix
+.........|.........|.........|.........| 
+...calculating S-parameters
+Simulation frequency [2] = 2.401 GHz
+...loading Green functions
+...loading interaction matrix
+.........|.........|.........|.........| 
+...solving interaction matrix
+.........|.........|.........|.........| 
+...calculating S-parameters
+S-parameter simulation finished
+Simulation finished on: Sun Oct 18 02:29:33 2026
+The simulation results have been saved in dataset "matched_patch".

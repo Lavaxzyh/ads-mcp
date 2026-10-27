@@ -64,6 +64,12 @@ def get_workroot() -> Path:
     return Path(os.environ.get("ADS_MCP_WORKROOT") or Path.home() / "ads_mcp_demo").expanduser().resolve()
 
 
+def get_state_file() -> Path:
+    """Runtime state belongs with user outputs, outside the source checkout."""
+    configured = os.environ.get("ADS_MCP_STATE_FILE")
+    return Path(configured).expanduser().resolve() if configured else get_workroot() / ".ads-mcp" / "session_state.json"
+
+
 def ensure_env() -> str:
     hpeesof_dir = str(get_ads_install_dir())
     if not Path(hpeesof_dir, "bin", "hpeesofsim.exe").exists():
@@ -614,7 +620,7 @@ class AdsEngine:
         return list(design.instances)
 
     # ---- simulation ----
-    def run_simulation(self, output_dir: str, netlist: str | None = None) -> dict[str, Any]:
+    def run_simulation(self, output_dir: str, netlist: str | None = None, data_directory: str = "") -> dict[str, Any]:
         """Blocking sim; call from a task thread. Returns dataset path + log tail."""
         with self._op():
             if netlist is None:
@@ -626,7 +632,13 @@ class AdsEngine:
             from keysight.edatoolbox import ads as eda_ads
 
             sim = eda_ads.CircuitSimulator()
-            sim.run_netlist(netlist, output_dir=str(out))  # raises RuntimeError with hpeesofsim msg
+            options = {}
+            if data_directory:
+                data = Path(data_directory).expanduser().resolve(strict=True)
+                if not data.is_dir():
+                    raise ValueError("data_directory must identify a local model-data directory")
+                options["rel_data_dir"] = str(data)
+            sim.run_netlist(netlist, output_dir=str(out), **options)  # raises RuntimeError with hpeesofsim msg
             ds_files = sorted(out.glob("*.ds"), key=lambda p: p.stat().st_mtime, reverse=True)
             if not ds_files:
                 raise RuntimeError(f"simulation produced no dataset in {out}")
@@ -667,7 +679,9 @@ class AdsEngine:
         with self._op():
             _, df = self._read_dataframe(ds_path)
             frequency = df.index.to_numpy(dtype=float)
-            target = np.linspace(expected["start_hz"], expected["stop_hz"], expected["points"])
+            target = np.linspace(expected["start_hz"], expected["stop_hz"], expected.get("rf_points", expected["points"]))
+            if expected.get("include_dc"):
+                target = np.r_[0.0, target]
             if len(frequency) != len(target) or not np.allclose(frequency, target, rtol=0, atol=1.0):
                 raise ValueError("Momentum dataset does not match the configured frequency grid (1 Hz tolerance)")
             return {"rows": int(len(df)), "freq_hz": [float(frequency[0]), float(frequency[-1])],
@@ -734,26 +748,9 @@ class AdsEngine:
 
         with self._op():
             keys, df = self._read_dataframe(ds_path)
-            if ports != 2:
-                raise ValueError("only two-port Touchstone export is supported")
-            # Touchstone 1.x two-port order is S11, S21, S12, S22.
-            s_cols = ["S[1,1]", "S[2,1]", "S[1,2]", "S[2,2]"]
-            present = {c for c in df.columns if re.fullmatch(r"S\[\d+,\d+\]", str(c))}
-            if present != set(s_cols):
-                raise ValueError("two-port dataset must contain S11, S21, S12 and S22")
-            out = Path(out_path)
-            out.parent.mkdir(parents=True, exist_ok=True)
-            with out.open("w", encoding="ascii") as fh:
-                fh.write(f"! Touchstone S2P written by ads-mcp from {Path(ds_path).name}\n")
-                fh.write(f"! varblocks: {','.join(keys)}\n")
-                fh.write("# HZ S RI R 50\n")
-                for f, r in df.iterrows():
-                    parts = [f"{float(f):.6e}"]
-                    for col in s_cols:
-                        v = complex(r[col])
-                        parts.append(f"{v.real:.6e} {v.imag:.6e}")
-                    fh.write(" ".join(parts) + "\n")
-            return {"touchstone": str(out), "rows": int(len(df)), "format": "HZ S RI R 50"}
+            from sparameter_results import export_touchstone
+            result = export_touchstone(df, out_path)
+            return {**result, "format": "HZ S RI R 50"}
 
     def plot_sparams(self, ds_path: str, out_png: str, columns: list[str] | None = None) -> dict[str, Any]:
         import math

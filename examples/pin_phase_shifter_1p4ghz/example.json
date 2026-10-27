@@ -1,0 +1,9 @@
+{
+  "name": "联合仿真反射式移相器",
+  "lib": "meander14_lib",
+  "metal_cell": "rtps180_compact80",
+  "testbenches": ["meander14_lib:rtps180_final_forward:schematic", "meander14_lib:rtps180_final_reverse:schematic"],
+  "paper": "https://ieeexplore.ieee.org/document/8752217/",
+  "doi": "10.1109/ACCESS.2019.2926140",
+  "scope": "Approximate reproduction of the 180-degree single-bit circuit; EM-circuit simulation, not measured hardware or the complete four-bit system."
+}

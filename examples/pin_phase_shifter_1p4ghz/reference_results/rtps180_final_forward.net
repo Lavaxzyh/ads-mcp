@@ -1,0 +1,86 @@
+; Top Design: "meander14_lib:rtps180_final_forward:schematic"
+; Netlisted using Hierarchy Policy: "Standard"
+
+Options ResourceUsage=yes UseNutmegFormat=no EnableOptim=no TopDesignName="meander14_lib:rtps180_final_forward:schematic" DcopOutputNodeVoltages=yes DcopOutputPinCurrents=yes DcopOutputAllSweepPoints=no DcopOutputDcopType=0
+; Library Name: meander14_lib
+; Cell Name: rtps180_compact80
+; View Name: emModel
+define rtps180_compact80 ( RF_IN  RF_OUT  A1_C1_A  A1_C1_B  A1_D_A  A1_D_B  A1_LP_A  A1_LP_B  A1_C3_A  A1_C3_B  A1_CHOKE_A  A1_CHOKE_B  A1_C2_A  A1_C2_B  A1_R_A  A1_R_B  A2_C1_A  A2_C1_B  A2_D_A  A2_D_B  A2_LP_A  A2_LP_B  A2_C3_A  A2_C3_B  A2_CHOKE_A  A2_CHOKE_B  A2_C2_A  A2_C2_B  A2_R_A  A2_R_B  BIAS1  BIAS2  ref=0 ) 
+;parameters 
+; MomCmpt model has node 0 as implicit reference. Ref node will be ignored and assumed to be grounded!
+em_data_name="meander14_lib:rtps180_compact80:emModel"
+MomCmpt:em_data  RF_IN RF_OUT A1_C1_A A1_C1_B A1_D_A A1_D_B A1_LP_A A1_LP_B A1_C3_A A1_C3_B \
+   A1_CHOKE_A A1_CHOKE_B A1_C2_A A1_C2_B A1_R_A A1_R_B A2_C1_A A2_C1_B A2_D_A A2_D_B \
+   A2_LP_A A2_LP_B A2_C3_A A2_C3_B A2_CHOKE_A A2_CHOKE_B A2_C2_A A2_C2_B A2_R_A A2_R_B \
+   BIAS1 BIAS2 \
+    name=em_data_name \
+    paramFile="" \
+    modelFile="C:/ADS/examples/pin_phase_shifter_1p4ghz/workspace/meander14_lib/rtps180_compact80/em%Model/model.ndx" \
+    ModelReuse=1 \
+    ModelType="MOMMW" \
+    ExtrapolationMode="linear" \
+    EnforcePassivity=-1
+end rtps180_compact80
+
+rtps180_compact80:EM1  N__2 N__3 N__31 N__17 N__30 N__4 N__29 N__16 N__28 N__15 N__27 N__14 N__26 N__13 N__25 N__12 N__24 N__6 N__23 N__0 N__22 N__7 N__21 N__8 N__20 N__9 N__19 N__10 N__18 N__11 N__5 N__1 
+C:C11  N__31 N__17 C=47 pF 
+L:LP1  N__29 N__16 L=LPVAL Noise=yes  
+C:C31  N__28 N__15 C=47 pF 
+L:CHOKE1  N__27 N__14 L=56 nH Noise=yes  
+C:C21  N__26 N__13 C=47 pF 
+R:R1  N__25 N__12 R=470 Ohm Noise=yes 
+#uselib "ckt" , "PIN_diode"
+PIN_diode:D1_BA682  N__30 N__32 Noise=yes Model_level=1 Is=1e-14 A N=1 Bv=35 V Rs=0 Ohm Rp=1000000000 Ohm Repi=1000000 Ohm Rlim=0.299977838477 Ohm W=0.0001 m Tau=9.87088877226e-07 s Cj=8.97867669434e-13 F M=0 Cpack=0 F Lbond=5.00111642933e-10 H 
+R:D1_RF_ESR  N__32 N__4 R=2*(VBIAS<0) Ohm Noise=yes 
+V_Source:VBIAS1  N__5 0 Type="V_DC" Vdc=VBIAS SaveCurrent=1 
+C:C12  N__24 N__6 C=47 pF 
+L:LP2  N__22 N__7 L=LPVAL Noise=yes  
+C:C32  N__21 N__8 C=47 pF 
+L:CHOKE2  N__20 N__9 L=56 nH Noise=yes  
+C:C22  N__19 N__10 C=47 pF 
+R:R2  N__18 N__11 R=470 Ohm Noise=yes 
+#uselib "ckt" , "PIN_diode"
+PIN_diode:D2_BA682  N__23 N__34 Noise=yes Model_level=1 Is=1e-14 A N=1 Bv=35 V Rs=0 Ohm Rp=1000000000 Ohm Repi=1000000 Ohm Rlim=0.299977838477 Ohm W=0.0001 m Tau=9.87088877226e-07 s Cj=8.97867669434e-13 F M=0 Cpack=0 F Lbond=5.00111642933e-10 H 
+R:D2_RF_ESR  N__34 N__0 R=2*(VBIAS<0) Ohm Noise=yes 
+V_Source:VBIAS2  N__1 0 Type="V_DC" Vdc=VBIAS SaveCurrent=1 
+
+X=1.0
+VBIAS=5 V
+LPVAL=11.4 nH
+DC:DC1 StatusLevel=2 DevOpPtLevel=4 UseFiniteDiff=no PrintOpPoint=yes Restart=1 \
+OutputPlan="DC1_Output" 
+
+OutputPlan:DC1_Output \
+      Type="Output" \
+      UseNodeNestLevel=yes \
+      NodeNestLevel=2 \
+      UseEquationNestLevel=yes \
+      EquationNestLevel=2 \
+      UseSavedEquationNestLevel=yes \
+      SavedEquationNestLevel=2 \
+      UseDeviceCurrentNestLevel=no \
+      DeviceCurrentNestLevel=0 \
+      DeviceCurrentDeviceType="All" \
+      DeviceCurrentSymSyntax=yes \
+      UseCurrentNestLevel=yes \
+      CurrentNestLevel=999 \
+      UseDeviceVoltageNestLevel=no \
+      DeviceVoltageNestLevel=0 \
+      DeviceVoltageDeviceType="All"
+
+S_Param:SP1 CalcS=yes CalcY=no CalcZ=no GroupDelayAperture=1e-4 FreqConversion=no FreqConversionPort=1 StatusLevel=2 CalcNoise=no SortNoise=0 BandwidthForNoise=1.0 Hz DevOpPtLevel=4 SPSS_WSP=yes \
+SweepVar="freq" SweepPlan="SP1_stim" OutputPlan="SP1_Output" 
+
+SweepPlan: SP1_stim Start=1.37 GHz Stop=1.43 GHz Step=.001 GHz 
+
+OutputPlan:SP1_Output \
+      Type="Output" \
+      UseEquationNestLevel=yes \
+      EquationNestLevel=2 \
+      UseSavedEquationNestLevel=yes \
+      SavedEquationNestLevel=2
+
+#load "python","LinearCollapse"
+Component Module="LinearCollapse" Type="ModelExtractor" NetworkRepresentation=2
+Port:RF_PORT1  N__2 0 Num=1 Z=50 Ohm Noise=yes 
+Port:RF_PORT2  N__3 0 Num=2 Z=50 Ohm Noise=yes 

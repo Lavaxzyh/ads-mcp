@@ -1,0 +1,12 @@
+<!DOCTYPE Materials>
+<Materials>
+    <Conductors>
+        <Conductor electron_path="" heat_capacity="" imag="" mur_imag="" mur_real="1" name="MCP_C_86c7183804044944" parmtype="1" real="58000000.0" tc1="" tc2="" thermal_conductivity="" thermal_conductivity_in_z="" tnom=""/>
+    </Conductors>
+    <Dielectrics>
+        <Dielectric electron_path="" er_imag="" er_loss="0.02" er_real="4.4" heat_capacity="" highfreq="1 THz" loss_type="1" lowfreq="1 kHz" mur_imag="" mur_real="1" name="MCP_D_176520cc0d2ddd77" thermal_conductivity="" thermal_conductivity_in_z="" valuefreq="1 GHz"/>
+    </Dielectrics>
+    <Semiconductors/>
+    <Superconductors/>
+    <roughness/>
+</Materials>

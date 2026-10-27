@@ -12,6 +12,27 @@
 - Stop before publishing if saved history is unavailable, and render from
   the exact collected snapshot rather than a cached raw Gist response.
 
+## 0.4.0
+
+### Added
+
+- 17 native workflow tools (49 total): inspect/open designs, connected Subnetwork terminals, instance parameters and simulation views, formal cell parameters, native Layout and Dual/Quad/lookalike symbols, vendor library registration, native emModel output/cache policy, mesh/frequency/port configuration, completed-optimizer release, ADS window arrangement and mesh visibility, and full-matrix result comparison.
+- GUI circuit simulation and native Optim dispatch through the selected installed ADS bridge, with persisted monitors and archived fresh datasets/logs. Standalone simulation remains the default.
+- Two independent native example workspaces: 1.4 GHz reflection phase-shifter cosimulation and complete-layout patch antenna EM optimization. Paper attribution, scope and ideal-component assumptions accompany the phase shifter.
+- Official AVX model downloader/provenance and import guide; no vendor kit or paper PDF redistribution.
+- Promotional material is prepared separately from the source distribution; `promo/` is not included in the repository.
+
+### Fixed
+
+- Generate Layout from existing schematic artwork instead of treating coordinate-drawn geometry as schematic conversion. Bind Subnetwork terminals to actual instance nets.
+- Support complete N-port Touchstone export, including 32-port models, preserving full numerical precision and standard matrix ordering.
+- Support one RF linear sweep with optional native discrete DC, internal uncalibrated ports and via substrate mappings.
+- Recognize native Momentum error banners, bound configuration-history filenames on Windows, and retain GUI dispatch callbacks until Qt executes them.
+- Separate mesh configuration, solver recomputation and mesh display. Configuration changes require workspace reload and a new solve; existing caches are not silently invalidated.
+- Rewrite both README tool tables against all 49 registered tools and update examples, N-port export, validation, and capability boundaries.
+- Replace machine-specific example metadata and nested solver-log host paths with generic release paths while preserving OA binaries and numerical solver data.
+- Store default task state under the user output root instead of a repository `state/` directory; explicit `ADS_MCP_STATE_FILE` still takes precedence.
+
 ## 0.3.0 (2026-10-15)
 
 ### Added

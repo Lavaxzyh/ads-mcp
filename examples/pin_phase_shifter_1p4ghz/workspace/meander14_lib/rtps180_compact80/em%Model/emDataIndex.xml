@@ -1,0 +1,21 @@
+<emDataViewDatabaseIndex>
+  <version major="1" minor="1"/>
+  <emDatabase>
+    <ParameterNames/>
+    <databaseItems>
+      <databaseItem index="0" name="data.000">
+        <parameterValues/>
+        <fileNames>
+          <name>data.000.sio</name>
+          <name>data.000.sam</name>
+          <name>data.000.log.zip</name>
+        </fileNames>
+        <originalFileNames>
+          <name>proj.sio</name>
+          <name>proj.sam</name>
+          <name>proj.log.zip</name>
+        </originalFileNames>
+      </databaseItem>
+    </databaseItems>
+  </emDatabase>
+</emDataViewDatabaseIndex>

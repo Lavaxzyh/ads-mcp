@@ -1,0 +1,7 @@
+{
+  "name": "Parameterized microstrip patch EM optimization",
+  "lib": "full_patch_lib",
+  "metal_cell": "matched_patch",
+  "testbenches": ["full_patch_lib:full_em_final_tb:schematic"],
+  "optimizer": "full_patch_lib:full_em_optimizer_tb:schematic"
+}

@@ -1,0 +1,51 @@
+{
+  "Wm_mm": 0.73277,
+  "Lm_mm": 20.58024,
+  "parameter_resolution_mm": 1e-05,
+  "parts": [
+    {
+      "name": "FEED50",
+      "bbox": "BoxF(lower_left=PointF(0.0, -1.52237), upper_right=PointF(8.56667, 1.52237))",
+      "pins": [
+        {
+          "n": 2,
+          "x": 8.56667,
+          "y": 0.0
+        },
+        {
+          "n": 1,
+          "x": 0.0,
+          "y": 0.0
+        }
+      ]
+    },
+    {
+      "name": "MATCH",
+      "bbox": "BoxF(lower_left=PointF(8.56667, -0.366385), upper_right=PointF(29.14691, 0.366385))",
+      "pins": [
+        {
+          "n": 2,
+          "x": 29.14691,
+          "y": 0.0
+        },
+        {
+          "n": 1,
+          "x": 8.56667,
+          "y": 0.0
+        }
+      ]
+    },
+    {
+      "name": "PATCH",
+      "bbox": "BoxF(lower_left=PointF(29.14691, -12.5), upper_right=PointF(59.14691, 12.5))",
+      "pins": [
+        {
+          "n": 1,
+          "x": 29.14691,
+          "y": 0.0
+        }
+      ]
+    }
+  ],
+  "junctions_connected": true
+}
