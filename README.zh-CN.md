@@ -2,15 +2,15 @@
 
 ![Clones](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones.json) ![Views](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/views.json) ![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/installs.json)
 
+**ads-mcp v0.4.0** 提供 49 个 Keysight ADS MCP 工具，核心流程是 **原理图 → 原生 Layout → Momentum → 原生 emModel → 电路联合仿真**。
+
 [English](README.md) · 简体中文
 
 [![Python](https://img.shields.io/badge/Python-3.14_(ADS%E8%87%AA%E5%B8%A6)-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)](https://modelcontextprotocol.io/) [![ADS](https://img.shields.io/badge/Tested_on_Keysight_ADS_2027-red)](https://www.keysight.com/) [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE) [![Tools](https://img.shields.io/badge/%E5%B7%A5%E5%85%B7%E6%95%B0-49-4c1)](docs/v040-tools.md)
 
-**ads-mcp v0.4.0** 提供 49 个 Keysight ADS MCP 工具，核心流程是 **原理图 → 原生 Layout → Momentum → 原生 emModel → 电路联合仿真**。
-
-本版包含原生 artwork 与 EM/电路联合仿真、完整金属区域的参数化天线优化、官方厂商模型下载/导入三条主线。另提供网格加密配置和在指定 ADS 进程中执行的 PySide6 窗口管理。电路仿真默认仍使用独立 `hpeesofsim` 后端。
-
-本项目采用 MIT 许可证，是第三方独立项目，不是 Keysight 官方产品。ADS 软件、专有模板、厂商库和论文 PDF 不随仓库分发。
+> 本版包含原生 artwork 与 EM/电路联合仿真、完整金属区域的参数化天线优化、官方厂商模型下载/导入三条主线。另提供网格加密配置和在指定 ADS 进程中执行的 PySide6 窗口管理。电路仿真默认仍使用独立 `hpeesofsim` 后端。
+>
+> 本项目采用 MIT 许可证，是第三方独立项目，不是 Keysight 官方产品。ADS 软件、专有模板、厂商库和论文 PDF 不随仓库分发。
 
 ## Python API 与依赖包
 

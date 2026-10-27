@@ -2,15 +2,15 @@
 
 ![Clones](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones.json) ![Views](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/views.json) ![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/installs.json)
 
+**ads-mcp v0.4.0** provides 49 MCP tools for Keysight ADS. The core workflow is **schematic → native Layout → Momentum → native emModel → circuit cosimulation**.
+
 English · [简体中文](README.zh-CN.md)
 
 [![Python](https://img.shields.io/badge/Python-3.14_(ADS-bundled)-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)](https://modelcontextprotocol.io/) [![ADS](https://img.shields.io/badge/Tested_on_Keysight_ADS_2027-red)](https://www.keysight.com/) [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE) [![Tools](https://img.shields.io/badge/Tools-49-4c1)](docs/v040-tools.md)
 
-**ads-mcp v0.4.0** provides 49 MCP tools for Keysight ADS. The core workflow is **schematic → native Layout → Momentum → native emModel → circuit cosimulation**.
-
-Three workflows are included: native artwork and EM/circuit cosimulation, parameterized complete-layout antenna optimization, and official vendor-model download/import. Mesh refinement and PySide6 window arrangement run through the selected ADS process. The default circuit backend remains standalone `hpeesofsim`.
-
-This is an independent MIT-licensed project, not an official Keysight product. ADS software, proprietary templates, vendor kits, and paper PDFs are not redistributed.
+> Three workflows are included: native artwork and EM/circuit cosimulation, parameterized complete-layout antenna optimization, and official vendor-model download/import. Mesh refinement and PySide6 window arrangement run through the selected ADS process. The default circuit backend remains standalone `hpeesofsim`.
+>
+> This is an independent MIT-licensed project, not an official Keysight product. ADS software, proprietary templates, vendor kits, and paper PDFs are not redistributed.
 
 ## Environment requirements and Python packages
 
