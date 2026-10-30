@@ -1,0 +1,82 @@
+{
+  "netlist_path": "<REPO>/examples/rf_jobs/test_wrk/pa_hb.net",
+  "contract": {
+    "frequency_target": {
+      "variable": "RFfreq",
+      "instance": "",
+      "model": "",
+      "parameter": "",
+      "scope": "",
+      "unit": "Hz"
+    },
+    "drive_target": {
+      "variable": "RFpower",
+      "instance": "",
+      "model": "",
+      "parameter": "",
+      "scope": "",
+      "unit": ""
+    },
+    "bias_targets": [
+      {
+        "variable": "Vhigh",
+        "instance": "",
+        "model": "",
+        "parameter": "",
+        "scope": "",
+        "unit": "V"
+      },
+      {
+        "variable": "Vlow",
+        "instance": "",
+        "model": "",
+        "parameter": "",
+        "scope": "",
+        "unit": "V"
+      }
+    ],
+    "harmonic_order": 15,
+    "input_voltage": "Vinput",
+    "input_current": "I_input.i",
+    "input_current_sign": 1,
+    "output_voltage": "Vload",
+    "output_current": "Iload.i",
+    "output_current_sign": 1,
+    "supplies": [
+      {
+        "voltage": "Vs_high",
+        "current": "Is_high.i",
+        "delivered_current_sign": 1
+      },
+      {
+        "voltage": "Vs_low",
+        "current": "Is_low.i",
+        "delivered_current_sign": 1
+      }
+    ],
+    "input_reference_plane": "PA input Vinput after source current probe",
+    "output_reference_plane": "50-ohm Vload after output current probe",
+    "network_boundary": "full ClassC_Amp_wBothMatches; only output L2 and C6 vary",
+    "model_conditions": "ADS bundled Generic_GaAsFet Area=10; Vhigh=4.8 V, Vlow=-2.75 V",
+    "source_termination": "50 ohm available-power tone",
+    "load_termination": "50 ohm",
+    "harmonic_terminations": "fixed vendor PLC at 3f and SLC at 2f; finite bias chokes",
+    "limits": {
+      "min_pout_dbm": 20.0,
+      "min_pae_pct": 10.0,
+      "min_gt_db": 10.0
+    },
+    "stress_voltage": "X4.VD_FET1",
+    "stress_current": "X4.ID_FET1.i"
+  },
+  "operating_points": [
+    {
+      "freq_hz": 935200000.0,
+      "pavs_dbm": 10,
+      "bias_values": [
+        4.8,
+        -2.75
+      ]
+    }
+  ]
+}

@@ -107,7 +107,7 @@ def _model_in_ads(a):
     ws = Path(a["workspace"]).resolve()
     if not de.workspace_is_open() or Path(de.active_workspace().path).resolve() != ws:
         raise RuntimeError("Open the requested workspace in this MCP server first")
-    lib = de.Library.get(a["lib"])
+    lib = (getattr(de.Library, "get", None) or de.get_open_library)(a["lib"])
     lib_dir = Path(de.get_path_to_open_library(a["lib"])).resolve()
     if not lib_dir.is_relative_to(ws):
         raise RuntimeError("Modeling requires a local library inside the selected workspace")
@@ -123,7 +123,15 @@ def _model_in_ads(a):
         return path
 
     def layer(name):
-        return LayerId.from_name(lib, name, "drawing")
+        resolve = getattr(LayerId, "from_name", None) or LayerId.create_layer_id_from_library
+        return resolve(lib, name, "drawing")
+
+    def view_folder(cell_name, view_name):
+        native_view = lib.cell(cell_name).view(view_name)
+        folder = getattr(native_view, "path", None)
+        if folder is None:
+            folder = de._pde.get_path_to_cellview(a["lib"], cell_name, view_name)
+        return inside(folder)
 
     if a["operation"] == "substrate":
         name = a["name"]
@@ -137,7 +145,8 @@ def _model_in_ads(a):
         for spec in a["dielectrics"]:
             key = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:16]
             material_name = "MCP_D_" + key
-            existing = next((m for m in mats.dielectrics if m.name == material_name), None)
+            # ADS 2025 iterates material dictionaries as (name, material) pairs.
+            existing = mats.dielectrics.get(material_name)
             if existing is not None:
                 if float(existing.er_real) != spec["er"] or float(existing.er_loss_tangent) != spec["loss_tangent"] or existing.loss_type != subst.DielectricLossType.FREQUENCY_INDEPENDENT:
                     raise RuntimeError("Existing generated dielectric material has conflicting parameters")
@@ -155,7 +164,7 @@ def _model_in_ads(a):
             if sigma is not None:
                 key = hashlib.sha256(str(sigma).encode()).hexdigest()[:16]
                 material_name = "MCP_C_" + key
-                existing = next((m for m in mats.conductors if m.name == material_name), None)
+                existing = mats.conductors.get(material_name)
                 if existing is not None:
                     if float(existing.real) != sigma or existing.parameter_type != subst.ConductorParamType.CONDUCTANCE:
                         raise RuntimeError("Existing generated conductor material has conflicting parameters")
@@ -228,7 +237,7 @@ def _model_in_ads(a):
         lay.save_design()
         return {"layout": a["lib"]+":"+cell_name+":"+view, "shape_count": len(a["shapes"]),
                 "input_units": "mm", "layout_units": lay.unit_name,
-                "layout_path": str(inside(lib.cell(cell_name).view(view).path))}
+                "layout_path": str(view_folder(cell_name, view))}
 
     if cell is None or not cell.view_exists(view):
         raise RuntimeError("Create and save the requested layout first")
@@ -277,12 +286,20 @@ def _model_in_ads(a):
         bbox = pin.get_pinfig_bbox()
         if bbox.lower_left.x != bbox.upper_right.x or bbox.lower_left.y != bbox.upper_right.y:
             raise RuntimeError("Momentum setup builder requires point pins, not area pins")
-        lid, point = pin.snap_layer_id, pin.snap_point
-        if lid.purpose != -1:
+        lid = getattr(pin, "snap_layer_id", None)
+        if lid is None:
+            fig = pin.get_primary_pin_fig()
+            lid = getattr(fig, "layer_id", None)
+        if lid is None:
+            raise RuntimeError("Cannot resolve the layer of the layout point pin")
+        point = pin.snap_point
+        # OA's drawing purpose is exposed unsigned by ADS 2025's binding.
+        purpose = -1 if lid.purpose == 0xFFFFFFFF else lid.purpose
+        if purpose != -1:
             raise RuntimeError("Layout ports must use the drawing purpose")
         ports.append({"name": term.name, "number": term.number, "net": term.net.name,
                       "x_m": point.x / lay.meter_to_uu_factor, "y_m": point.y / lay.meter_to_uu_factor,
-                      "layer": lid.layer, "purpose": lid.purpose,
+                      "layer": lid.layer, "purpose": purpose,
                       "layer_name": lib.tech.find_layer(lid.layer).name})
     template = Path(os.environ["HPEESOF_DIR"]) / "em" / "setupTemplates" / "RFBoard.emSetupT"
     root = ET.parse(template).getroot()
@@ -405,7 +422,7 @@ def _model_in_ads(a):
     # Create the registered external OA view; paths are supplied by ADS, not
     # guessed from Windows name encoding. Existing views are never overwritten.
     setup_view = cell.create_view(a["setup"], "eesof_em_setup")
-    folder = inside(setup_view.path)
+    folder = view_folder(cell_name, a["setup"])
     folder.mkdir(parents=True, exist_ok=True)
     xml = folder / "emStateFile.xml"
     temporary = folder / ("emStateFile."+uuid.uuid4().hex+".tmp")
@@ -432,7 +449,12 @@ def _model_in_ads(a):
 
 
 class EmModeler:
-    def execute(self, workspace: str, lib: str, operation: str, **data) -> dict:
+    def execute(self, workspace: str, lib: str, operation: str, *, session_id: int | None = None, **data) -> dict:
+        from workspace_activity import edit_guard
+        with edit_guard(workspace):
+            return self._execute(workspace, lib, operation, session_id=session_id, **data)
+
+    def _execute(self, workspace: str, lib: str, operation: str, *, session_id: int | None = None, **data) -> dict:
         ws = Path(workspace).expanduser().resolve(strict=True)
         if not (ws / "lib.defs").is_file():
             raise ValueError("workspace must contain lib.defs")
@@ -477,7 +499,11 @@ class EmModeler:
         else:
             raise ValueError("unknown modeling operation")
         args = {"workspace": str(ws), "lib": lib, "operation": operation, **data}
-        result = _model_in_ads(args)
+        if session_id is None:
+            result = _model_in_ads(args)
+        else:
+            from ads_gui import call_native
+            result = call_native(_model_in_ads, args, session_id, str(ws))
         if operation == "setup":
             result["inspection"] = inspect_setup(str(ws), result["setup_file"], data["setup"])
         return result

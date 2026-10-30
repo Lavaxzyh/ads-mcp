@@ -1,12 +1,17 @@
 """Window operations executed inside ADS, never against other applications."""
+from native_geometry import layout_geometry_snapshot
 
 
 def window_operation(a):
     import math
     import re
-    from PySide6.QtWidgets import QApplication, QMainWindow, QDialog, QLabel
-    from PySide6.QtGui import QAction
-    from shiboken6 import isValid
+    try:
+        from PySide6.QtWidgets import QApplication, QMainWindow, QDialog, QLabel
+        from PySide6.QtGui import QAction
+        from shiboken6 import isValid
+    except ImportError:
+        from PySide2.QtWidgets import QApplication, QMainWindow, QDialog, QLabel, QAction
+        from shiboken2 import isValid
     app = QApplication.instance()
     if app is None:
         raise RuntimeError("ADS GUI QApplication not found")
@@ -39,22 +44,46 @@ def window_operation(a):
         w = chosen[0]
         from keysight.ads.de import db_uu as db
         d = db.open_design(design(w), db.DesignMode.READ_ONLY)
+        modern_mesh = getattr(db, 'MomentumMesh', None)
+        tracked = getattr(app, '_ads_mcp_legacy_mesh', {})
+        def objects():return list(db.AppObjectIter(d))
         def mesh_count():
-            return sum(isinstance(obj, db.MomentumMesh) for obj in db.AppObjectIter(d))
+            if modern_mesh is not None:
+                return sum(isinstance(obj, modern_mesh) for obj in objects())
+            current = objects()
+            return sum(any(obj == saved for saved in tracked.get(design(w), [])) for obj in current)
         before_count = mesh_count()
         # ADS 2027 uses import/clear actions, not a checkable visibility action.
         # Counting native mesh objects also avoids mistaking menu state for data.
         action_name = "Momentum Mesh" if a["visible"] else "Clear Momentum Mesh"
-        if bool(before_count) != a["visible"]:
-            if a["visible"]:
-                from keysight.ads import de
-                from pathlib import Path
-                ctx = de.ael.db_find_design_context_from_name(design(w), 0)
-                setup = de.ael.deem_find_em_setup_view_name_for_context(ctx)
-                lib, cell, view = design(w).split(":")
-                folder = Path(de.active_workspace().path) / "simulation" / lib / cell / view / (str(setup) + "_MoM")
-                if not setup or not (folder / "proj.msh").is_file():
-                    raise ValueError("Native saved Momentum mesh is missing for this layout/setup; run Momentum first")
+        proof = None
+        if a["visible"]:
+            import hashlib
+            import json
+            from keysight.ads import de
+            from pathlib import Path
+            ctx = de.ael.db_find_design_context_from_name(design(w), 0)
+            setup = de.ael.deem_find_em_setup_view_name_for_context(ctx)
+            lib, cell, view = design(w).split(":")
+            ws = Path(de.active_workspace().path).resolve()
+            folder = ws / "simulation" / lib / cell / view / (str(setup) + "_MoM")
+            proof_file = folder / 'ads-mcp-mesh-proof.json'
+            if not setup or not (folder / "proj.msh").is_file() or not proof_file.is_file():
+                raise ValueError("A completed MCP Momentum solve with mesh/geometry evidence is required for this layout")
+            proof = json.loads(proof_file.read_text(encoding='utf-8'))
+            for field in ('mesh_file','setup_file'):
+                if not Path(proof[field]).resolve().is_relative_to(ws):
+                    raise ValueError('Mesh evidence points outside the selected workspace')
+            if Path(proof['mesh_file']).resolve() != (folder/'proj.msh').resolve():
+                raise ValueError('Mesh evidence belongs to another simulation directory')
+            if hashlib.sha256((folder/'proj.msh').read_bytes()).hexdigest()!=proof['mesh_sha256']:
+                raise ValueError('Saved mesh has changed since its verified solve')
+            if hashlib.sha256(Path(proof['setup_file']).read_bytes()).hexdigest()!=proof['setup_sha256']:
+                raise ValueError('EM setup changed since mesh generation')
+            geometry = layout_geometry_snapshot({'lib':lib,'cell':cell,'view':view})
+            if geometry['sha256']!=proof['geometry']['sha256']:
+                raise ValueError('Current native geometry does not match the saved Momentum mesh')
+        def trigger(action_name):
             actions = [x for x in w.findChildren(QAction) if x.objectName() == action_name]
             if len(actions) != 1 or not actions[0].isEnabled():
                 raise RuntimeError(action_name + " action unavailable")
@@ -62,6 +91,20 @@ def window_operation(a):
             w.activateWindow()
             app.processEvents()
             actions[0].trigger()
+            app.processEvents()
+        if modern_mesh is None:
+            # ADS 2025 exposes generic AppObjects. Identify only objects
+            # introduced by the native Mesh action after its own Clear action;
+            # unrelated application objects are neither counted nor removed.
+            trigger('Clear Momentum Mesh')
+            baseline = objects()
+            tracked[design(w)] = []
+            if a['visible']:
+                trigger('Momentum Mesh')
+                tracked[design(w)] = [obj for obj in objects() if not any(obj==old for old in baseline)]
+            app._ads_mcp_legacy_mesh = tracked
+        elif bool(before_count) != a['visible']:
+            trigger(action_name)
         app.processEvents()
         errors = []
         for dialog in app.topLevelWidgets():
@@ -73,7 +116,8 @@ def window_operation(a):
         return {"window": describe(w), "errors": errors, "before_mesh_objects": before_count,
                 "visibility_requested": a["visible"], "mesh_objects": count,
                 "mesh_loaded_verified": count > 0, "visibility_applied": bool(count) == a["visible"],
-                "note": "Native display objects only; no design is saved and geometry/sample correspondence needs separate validation"}
+                "geometry_correspondence_verified": bool(proof), "source_task_id": proof['task_id'] if proof else None,
+                "note": "Native mesh display only; geometry/setup/file hashes are checked before loading; no design is saved"}
     snapshots = getattr(app, "_ads_mcp_window_states", {})
     mode = a["mode"]
     screen = next((s for s in app.screens() if s.name() == a.get("screen")), None) if a.get("screen") else chosen[0].screen()
@@ -118,3 +162,6 @@ def window_operation(a):
     app.processEvents()
     return {"before": before, "after": [describe(w) for w in chosen], "mode": mode,
             "screens": screens}
+
+
+window_operation.__ads_mcp_dependencies__ = (layout_geometry_snapshot,)

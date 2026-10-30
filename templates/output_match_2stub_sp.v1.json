@@ -1,0 +1,843 @@
+{
+  "id": "output_match_2stub_sp@1",
+  "version": 1,
+  "applicability": {
+    "topology": "Two shunt open stubs with stepped series microstrip, drain feed, bypass capacitors and output DC block",
+    "models": "ADS built-in quasi-static microstrip, ideal lumped capacitors and DC source; no transistor",
+    "analysis": "Linear two-port SP, explicit positive real reference impedances; build does not run simulation or Optim",
+    "substrate": "MSub1, all electrical substrate choices required; unlisted model fields remain ADS-native defaults and must be inspected in the capability profile",
+    "engineering_limit": "A structurally verified topology is not a designed match or a verified PA; all dimensions/targets/board/ports are caller supplied"
+  },
+  "verification": {
+    "scope": "ADS 2025 representative build/save/reopen and graph checks; see docs/VALIDATION.zh-CN.md",
+    "template_expansion": "Short and full synthetic fixtures must expand to the same electrical graph",
+    "nonlinear_performance": "not verified; synthetic fixtures are not PA designs"
+  },
+  "required_inputs": [
+    "C_DCval",
+    "C_DECOUPval",
+    "C_HFval",
+    "GOAL1.Max",
+    "GOAL1.Weight",
+    "GOAL2.Min",
+    "GOAL2.Weight",
+    "L_OS1",
+    "L_OS2",
+    "L_OUT",
+    "L_SUP",
+    "L_TB",
+    "L_TL1",
+    "L_TL2",
+    "MSub1.Cond",
+    "MSub1.Er",
+    "MSub1.FreqForEpsrTanD",
+    "MSub1.H",
+    "MSub1.Rough",
+    "MSub1.T",
+    "MSub1.TanD",
+    "OPT1.MaxIters",
+    "OPT1.OptimType",
+    "Rtarget",
+    "VDD",
+    "W_OS1",
+    "W_OS2",
+    "W_OUT",
+    "W_SUP",
+    "W_TB",
+    "W_TL1",
+    "W_TL2",
+    "Xtarget"
+  ],
+  "protected_override_fields": [
+    "GOAL1.parameters.RangeMax",
+    "GOAL1.parameters.RangeMin",
+    "GOAL2.parameters.RangeMax",
+    "GOAL2.parameters.RangeMin",
+    "MSub1.parameters.Cond",
+    "MSub1.parameters.Er",
+    "MSub1.parameters.FreqForEpsrTanD",
+    "MSub1.parameters.H",
+    "MSub1.parameters.Rough",
+    "MSub1.parameters.T",
+    "MSub1.parameters.TanD",
+    "SP1.parameters.Start",
+    "SP1.parameters.Step",
+    "SP1.parameters.Stop",
+    "Term1.parameters.Num",
+    "Term1.parameters.Z",
+    "Term2.parameters.Num",
+    "Term2.parameters.Z",
+    "VAR_TARGET.variables.Rtarget",
+    "VAR_TARGET.variables.Xtarget",
+    "VAR_TARGET.variables.Zref"
+  ],
+  "plan_sha256": "821e78e094b95dda2b7af697ea52dc13a38b1e6b7b2c5beac8b75510e270274b",
+  "plan": {
+    "schema_version": 1,
+    "components": [
+      {
+        "name": "SP1",
+        "library": "ads_simulation",
+        "cell": "S_Param",
+        "at": [
+          0.0,
+          -11.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "Start": {
+            "$derived": "Start"
+          },
+          "Stop": {
+            "$derived": "Stop"
+          },
+          "Step": {
+            "$derived": "Step"
+          }
+        }
+      },
+      {
+        "name": "Term2",
+        "library": "ads_simulation",
+        "cell": "Term",
+        "at": [
+          25.0,
+          0.0
+        ],
+        "angle": -90,
+        "parameters": {
+          "Num": "2",
+          "Z": {
+            "$derived": "port2"
+          }
+        }
+      },
+      {
+        "name": "Term1",
+        "library": "ads_simulation",
+        "cell": "Term",
+        "at": [
+          0.0,
+          0.0
+        ],
+        "angle": -90,
+        "parameters": {
+          "Num": "1",
+          "Z": {
+            "$derived": "port1"
+          },
+          "Vdc": "VDD"
+        }
+      },
+      {
+        "name": "VAR1",
+        "library": "ads_datacmps",
+        "cell": "VAR",
+        "at": [
+          0.0,
+          -6.0
+        ],
+        "angle": 0,
+        "parameters": {},
+        "variables": {
+          "W_TL1": {
+            "$input": "W_TL1"
+          },
+          "L_TL1": {
+            "$input": "L_TL1"
+          },
+          "W_TL2": {
+            "$input": "W_TL2"
+          },
+          "L_TL2": {
+            "$input": "L_TL2"
+          },
+          "W_OS1": {
+            "$input": "W_OS1"
+          },
+          "L_OS1": {
+            "$input": "L_OS1"
+          },
+          "W_OS2": {
+            "$input": "W_OS2"
+          },
+          "L_OS2": {
+            "$input": "L_OS2"
+          },
+          "C_DCval": {
+            "$input": "C_DCval"
+          }
+        }
+      },
+      {
+        "name": "G4",
+        "library": "ads_rflib",
+        "cell": "GROUND",
+        "at": [
+          25.0,
+          -1.0
+        ],
+        "angle": -90,
+        "parameters": {}
+      },
+      {
+        "name": "G3",
+        "library": "ads_rflib",
+        "cell": "GROUND",
+        "at": [
+          0.0,
+          -1.0
+        ],
+        "angle": -90,
+        "parameters": {}
+      },
+      {
+        "name": "VAR_FEED",
+        "library": "ads_datacmps",
+        "cell": "VAR",
+        "at": [
+          7.0,
+          -6.0
+        ],
+        "angle": 0,
+        "parameters": {},
+        "variables": {
+          "W_TB": {
+            "$input": "W_TB"
+          },
+          "L_TB": {
+            "$input": "L_TB"
+          },
+          "W_SUP": {
+            "$input": "W_SUP"
+          },
+          "L_SUP": {
+            "$input": "L_SUP"
+          },
+          "W_OUT": {
+            "$input": "W_OUT"
+          },
+          "L_OUT": {
+            "$input": "L_OUT"
+          },
+          "C_HFval": {
+            "$input": "C_HFval"
+          },
+          "C_DECOUPval": {
+            "$input": "C_DECOUPval"
+          },
+          "VDD": {
+            "$input": "VDD"
+          }
+        }
+      },
+      {
+        "name": "VAR_TARGET",
+        "library": "ads_datacmps",
+        "cell": "VAR",
+        "at": [
+          21.0,
+          -6.0
+        ],
+        "angle": 0,
+        "parameters": {},
+        "variables": {
+          "Zref": {
+            "$derived": "Zref"
+          },
+          "Rtarget": {
+            "$input": "Rtarget"
+          },
+          "Xtarget": {
+            "$input": "Xtarget"
+          }
+        }
+      },
+      {
+        "name": "MSub1",
+        "library": "ads_tlines",
+        "cell": "MSUB",
+        "at": [
+          14.0,
+          -6.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "Er": {
+            "$input": "MSub1.Er"
+          },
+          "H": {
+            "$input": "MSub1.H"
+          },
+          "T": {
+            "$input": "MSub1.T"
+          },
+          "TanD": {
+            "$input": "MSub1.TanD"
+          },
+          "Cond": {
+            "$input": "MSub1.Cond"
+          },
+          "Rough": {
+            "$input": "MSub1.Rough"
+          },
+          "FreqForEpsrTanD": {
+            "$input": "MSub1.FreqForEpsrTanD"
+          }
+        }
+      },
+      {
+        "name": "JT_B",
+        "library": "ads_tlines",
+        "cell": "MTEE",
+        "at": [
+          4.0,
+          0.0
+        ],
+        "angle": 180,
+        "parameters": {
+          "W1": "W_TL1",
+          "W2": "W_TL1",
+          "W3": "W_TB"
+        }
+      },
+      {
+        "name": "TL1",
+        "library": "ads_tlines",
+        "cell": "MLIN",
+        "at": [
+          6.0,
+          0.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "W": "W_TL1",
+          "L": "L_TL1"
+        }
+      },
+      {
+        "name": "JT1",
+        "library": "ads_tlines",
+        "cell": "MTEE",
+        "at": [
+          9.0,
+          0.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "W1": "W_TL1",
+          "W2": "W_TL2",
+          "W3": "W_OS1"
+        }
+      },
+      {
+        "name": "TL2",
+        "library": "ads_tlines",
+        "cell": "MLIN",
+        "at": [
+          12.0,
+          0.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "W": "W_TL2",
+          "L": "L_TL2"
+        }
+      },
+      {
+        "name": "JT2",
+        "library": "ads_tlines",
+        "cell": "MTEE",
+        "at": [
+          15.0,
+          0.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "W1": "W_TL2",
+          "W2": "W_OUT",
+          "W3": "W_OS2"
+        }
+      },
+      {
+        "name": "C_DC",
+        "library": "ads_rflib",
+        "cell": "C",
+        "at": [
+          18.0,
+          0.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "C": "C_DCval"
+        }
+      },
+      {
+        "name": "TL_OUT",
+        "library": "ads_tlines",
+        "cell": "MLIN",
+        "at": [
+          21.0,
+          0.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "W": "W_OUT",
+          "L": "L_OUT"
+        }
+      },
+      {
+        "name": "OS1",
+        "library": "ads_tlines",
+        "cell": "MLEF",
+        "at": [
+          9.5,
+          -2.0
+        ],
+        "angle": -90,
+        "parameters": {
+          "W": "W_OS1",
+          "L": "L_OS1"
+        }
+      },
+      {
+        "name": "OS2",
+        "library": "ads_tlines",
+        "cell": "MLEF",
+        "at": [
+          15.5,
+          -2.0
+        ],
+        "angle": -90,
+        "parameters": {
+          "W": "W_OS2",
+          "L": "L_OS2"
+        }
+      },
+      {
+        "name": "TB",
+        "library": "ads_tlines",
+        "cell": "MLIN",
+        "at": [
+          3.5,
+          2.0
+        ],
+        "angle": 90,
+        "parameters": {
+          "W": "W_TB",
+          "L": "L_TB"
+        }
+      },
+      {
+        "name": "TL_SUP",
+        "library": "ads_tlines",
+        "cell": "MLIN",
+        "at": [
+          3.5,
+          6.0
+        ],
+        "angle": 90,
+        "parameters": {
+          "W": "W_SUP",
+          "L": "L_SUP"
+        }
+      },
+      {
+        "name": "C_HF",
+        "library": "ads_rflib",
+        "cell": "C",
+        "at": [
+          7.0,
+          4.0
+        ],
+        "angle": -90,
+        "parameters": {
+          "C": "C_HFval"
+        }
+      },
+      {
+        "name": "C_DECOUP",
+        "library": "ads_rflib",
+        "cell": "C",
+        "at": [
+          12.0,
+          8.0
+        ],
+        "angle": -90,
+        "parameters": {
+          "C": "C_DECOUPval"
+        }
+      },
+      {
+        "name": "V_DRAIN",
+        "library": "ads_sources",
+        "cell": "V_DC",
+        "at": [
+          15.0,
+          8.0
+        ],
+        "angle": -90,
+        "parameters": {
+          "Vdc": "VDD"
+        }
+      },
+      {
+        "name": "OPT1",
+        "library": "ads_simulation",
+        "cell": "Optim",
+        "at": [
+          7.0,
+          -11.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "MaxIters": {
+            "$input": "OPT1.MaxIters"
+          },
+          "SaveOptimVars": "yes",
+          "SaveAllIterations": "yes"
+        },
+        "forms": {
+          "OptimType": {
+            "$input": "OPT1.OptimType"
+          }
+        }
+      },
+      {
+        "name": "G5",
+        "library": "ads_rflib",
+        "cell": "GROUND",
+        "at": [
+          7.0,
+          3.0
+        ],
+        "angle": -90,
+        "parameters": {}
+      },
+      {
+        "name": "G6",
+        "library": "ads_rflib",
+        "cell": "GROUND",
+        "at": [
+          12.0,
+          7.0
+        ],
+        "angle": -90,
+        "parameters": {}
+      },
+      {
+        "name": "G7",
+        "library": "ads_rflib",
+        "cell": "GROUND",
+        "at": [
+          15.0,
+          7.0
+        ],
+        "angle": -90,
+        "parameters": {}
+      },
+      {
+        "name": "OM_EQ",
+        "library": "ads_simulation",
+        "cell": "MeasEqn",
+        "at": [
+          0.0,
+          -16.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "Meas": [
+            "OM_Ztarget=Rtarget+j*Xtarget",
+            "OM_Zseen=Zref*(1+S(1,1))/(1-S(1,1))",
+            "OM_MatchErr=mag((OM_Zseen-OM_Ztarget)/(OM_Zseen+conj(OM_Ztarget)))",
+            "OM_EtaNet=mag(S(2,1))^2/(1-mag(S(1,1))^2)"
+          ]
+        }
+      },
+      {
+        "name": "GOAL1",
+        "library": "ads_simulation",
+        "cell": "Goal",
+        "at": [
+          14.0,
+          -11.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "Expr": "OM_MatchErr",
+          "SimInstanceName": "SP1",
+          "Max": {
+            "$input": "GOAL1.Max"
+          },
+          "Weight": {
+            "$input": "GOAL1.Weight"
+          },
+          "RangeVar": [
+            "freq"
+          ],
+          "RangeMin": [
+            {
+              "$derived": "RangeMin"
+            }
+          ],
+          "RangeMax": [
+            {
+              "$derived": "RangeMax"
+            }
+          ]
+        }
+      },
+      {
+        "name": "GOAL2",
+        "library": "ads_simulation",
+        "cell": "Goal",
+        "at": [
+          21.0,
+          -11.0
+        ],
+        "angle": 0,
+        "parameters": {
+          "Expr": "OM_EtaNet",
+          "SimInstanceName": "SP1",
+          "Min": {
+            "$input": "GOAL2.Min"
+          },
+          "Weight": {
+            "$input": "GOAL2.Weight"
+          },
+          "RangeVar": [
+            "freq"
+          ],
+          "RangeMin": [
+            {
+              "$derived": "RangeMin"
+            }
+          ],
+          "RangeMax": [
+            {
+              "$derived": "RangeMax"
+            }
+          ]
+        }
+      }
+    ],
+    "wires": [
+      {
+        "start": "Term1:1",
+        "end": "JT_B:2",
+        "via": [],
+        "label": "DRAIN_A"
+      },
+      {
+        "start": "JT_B:1",
+        "end": "TL1:1",
+        "via": [],
+        "label": ""
+      },
+      {
+        "start": "TL1:2",
+        "end": "JT1:1",
+        "via": [],
+        "label": ""
+      },
+      {
+        "start": "JT1:2",
+        "end": "TL2:1",
+        "via": [],
+        "label": ""
+      },
+      {
+        "start": "TL2:2",
+        "end": "JT2:1",
+        "via": [],
+        "label": ""
+      },
+      {
+        "start": "JT2:2",
+        "end": "C_DC:1",
+        "via": [],
+        "label": ""
+      },
+      {
+        "start": "C_DC:2",
+        "end": "TL_OUT:1",
+        "via": [],
+        "label": ""
+      },
+      {
+        "start": "TL_OUT:2",
+        "end": "Term2:1",
+        "via": [],
+        "label": "RF_OUT_50"
+      },
+      {
+        "start": "JT1:3",
+        "end": "OS1:1",
+        "via": [],
+        "label": ""
+      },
+      {
+        "start": "JT2:3",
+        "end": "OS2:1",
+        "via": [],
+        "label": ""
+      },
+      {
+        "start": "JT_B:3",
+        "end": "TB:1",
+        "via": [],
+        "label": ""
+      },
+      {
+        "start": "TB:2",
+        "end": "TL_SUP:1",
+        "via": [
+          [
+            3.5,
+            4
+          ]
+        ],
+        "label": "BIAS_B"
+      },
+      {
+        "start": "TB:2",
+        "end": "C_HF:1",
+        "via": [
+          [
+            3.5,
+            4
+          ]
+        ],
+        "label": ""
+      },
+      {
+        "start": "TL_SUP:2",
+        "end": "C_DECOUP:1",
+        "via": [
+          [
+            3.5,
+            8
+          ]
+        ],
+        "label": "VDD_RAIL"
+      },
+      {
+        "start": "C_DECOUP:1",
+        "end": "V_DRAIN:1",
+        "via": [],
+        "label": ""
+      }
+    ],
+    "expected_nets": [
+      {
+        "name": "gnd!",
+        "pins": [
+          "Term2:2",
+          "Term1:2",
+          "G4:1",
+          "G3:1",
+          "C_HF:2",
+          "C_DECOUP:2",
+          "V_DRAIN:2",
+          "G5:1",
+          "G6:1",
+          "G7:1"
+        ]
+      },
+      {
+        "name": "RF_OUT_50",
+        "pins": [
+          "Term2:1",
+          "TL_OUT:2"
+        ]
+      },
+      {
+        "name": "DRAIN_A",
+        "pins": [
+          "Term1:1",
+          "JT_B:2"
+        ]
+      },
+      {
+        "name": "N__4",
+        "pins": [
+          "JT_B:1",
+          "TL1:1"
+        ]
+      },
+      {
+        "name": "N__5",
+        "pins": [
+          "JT_B:3",
+          "TB:1"
+        ]
+      },
+      {
+        "name": "N__9",
+        "pins": [
+          "TL1:2",
+          "JT1:1"
+        ]
+      },
+      {
+        "name": "N__10",
+        "pins": [
+          "JT1:3",
+          "OS1:1"
+        ]
+      },
+      {
+        "name": "N__8",
+        "pins": [
+          "JT1:2",
+          "TL2:1"
+        ]
+      },
+      {
+        "name": "N__14",
+        "pins": [
+          "TL2:2",
+          "JT2:1"
+        ]
+      },
+      {
+        "name": "N__15",
+        "pins": [
+          "JT2:3",
+          "OS2:1"
+        ]
+      },
+      {
+        "name": "N__13",
+        "pins": [
+          "JT2:2",
+          "C_DC:1"
+        ]
+      },
+      {
+        "name": "N__18",
+        "pins": [
+          "C_DC:2",
+          "TL_OUT:1"
+        ]
+      },
+      {
+        "name": "BIAS_B",
+        "pins": [
+          "TB:2",
+          "TL_SUP:1",
+          "C_HF:1"
+        ]
+      },
+      {
+        "name": "VDD_RAIL",
+        "pins": [
+          "TL_SUP:2",
+          "C_DECOUP:1",
+          "V_DRAIN:1"
+        ]
+      }
+    ],
+    "notes": []
+  }
+}

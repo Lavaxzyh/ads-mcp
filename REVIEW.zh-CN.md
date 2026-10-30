@@ -1,5 +1,7 @@
 # v0.4.0 本地审查记录
 
+> 以下为上游 v0.4.0 的历史审查记录，适用其 ADS 2027 环境；原有结果保留出处。当前 ADS 2025 分支的验证见 [docs/VALIDATION.zh-CN.md](docs/VALIDATION.zh-CN.md)，两者不能混用。
+
 版本：ads-mcp v0.4.0。
 
 已核验：

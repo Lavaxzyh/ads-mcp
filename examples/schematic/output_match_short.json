@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "kind": "template",
+  "template": "output_match_2stub_sp@1",
+  "target": {
+    "workspace": "C:/ads-mcp-example/task/design_wrk",
+    "library": "example_lib",
+    "cell": "output_match_example"
+  },
+  "contract": {
+    "execution": "build_only",
+    "testbench": "linear_sp",
+    "network_boundary": "Synthetic software fixture: two-stub network, ideal bias feed and DC block; no transistor or PA performance claim",
+    "ports": [
+      {
+        "instance": "Term1",
+        "number": 1,
+        "impedance": "50 Ohm",
+        "reference_plane": "Synthetic example network port 1"
+      },
+      {
+        "instance": "Term2",
+        "number": 2,
+        "impedance": "50 Ohm",
+        "reference_plane": "Synthetic example network port 2"
+      }
+    ],
+    "frequency_hz": [
+      1000000000.0,
+      1200000000.0,
+      10000000.0
+    ],
+    "result_meaning": "initial_values_not_simulated"
+  },
+  "optimizer_enabled": false,
+  "inputs": {
+    "W_TL1": "1 mm",
+    "L_TL1": "2 mm",
+    "W_TL2": "1 mm",
+    "L_TL2": "4 mm",
+    "W_OS1": "1 mm",
+    "L_OS1": "10 mm",
+    "W_OS2": "1 mm",
+    "L_OS2": "8 mm",
+    "C_DCval": "100 pF",
+    "W_TB": "0.5 mm",
+    "L_TB": "10 mm",
+    "W_SUP": "0.5 mm",
+    "L_SUP": "4 mm",
+    "W_OUT": "1 mm",
+    "L_OUT": "2 mm",
+    "C_HFval": "100 pF",
+    "C_DECOUPval": "1 nF",
+    "VDD": "0 V",
+    "Rtarget": "50",
+    "Xtarget": "0",
+    "MSub1.Er": "3.0",
+    "MSub1.H": "0.5 mm",
+    "MSub1.T": "35 um",
+    "MSub1.TanD": "0.002",
+    "MSub1.Cond": "5.8e7",
+    "MSub1.Rough": "0 mm",
+    "MSub1.FreqForEpsrTanD": "1.1 GHz",
+    "OPT1.MaxIters": "6",
+    "OPT1.OptimType": "Gradient",
+    "GOAL1.Max": "0.1",
+    "GOAL1.Weight": "1",
+    "GOAL2.Min": "0.5",
+    "GOAL2.Weight": "1"
+  },
+  "overrides": []
+}

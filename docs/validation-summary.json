@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "version": "0.4.0+ads2025.20261030.3",
+  "environment": {
+    "os": "Windows",
+    "ads": "ADS 2025 610.shp",
+    "python": "3.12.2",
+    "pyside": "5.15.10"
+  },
+  "publication_checks": {
+    "unit_tests": {
+      "run": 201,
+      "passed": true,
+      "entrypoint": "tools/run_unit_tests.py"
+    },
+    "native_synthetic_schematic": {
+      "passed": true,
+      "checks": {
+        "upstream_tool_names_preserved": true,
+        "tool_count": true,
+        "fresh_release_identity": true,
+        "synthetic_template_native_save_reopen": true,
+        "single_target_incremental_edit": true,
+        "replay_no_duplicate_mutation": true,
+        "native_fresh_inspection": true,
+        "validated_snapshot_reuse": true,
+        "invalid_input_no_write": true,
+        "no_solver_dispatched": true,
+        "one_final_schematic": true
+      },
+      "upstream_tool_count": 49,
+      "registered_tool_count": 64,
+      "upstream_tools": [
+        "ads_add_design_port",
+        "ads_add_goal",
+        "ads_add_ground",
+        "ads_add_layout_ports",
+        "ads_add_optim",
+        "ads_add_term",
+        "ads_add_var",
+        "ads_add_wire",
+        "ads_arrange_windows",
+        "ads_audit_schematic",
+        "ads_autolabel",
+        "ads_browse_components",
+        "ads_check_installed",
+        "ads_close_workspace",
+        "ads_compare_sparameters",
+        "ads_configure_em_model",
+        "ads_configure_em_parameters",
+        "ads_configure_momentum_mesh",
+        "ads_configure_momentum_options",
+        "ads_configure_momentum_setup",
+        "ads_create_layout",
+        "ads_create_library",
+        "ads_create_schematic",
+        "ads_create_substrate",
+        "ads_create_workspace",
+        "ads_define_cell_parameters",
+        "ads_export_touchstone",
+        "ads_generate_layout",
+        "ads_generate_netlist",
+        "ads_generate_symbol",
+        "ads_get_results",
+        "ads_get_sim_status",
+        "ads_import_library",
+        "ads_inspect_em_model",
+        "ads_inspect_momentum_setup",
+        "ads_list_gui_sessions",
+        "ads_list_instances",
+        "ads_list_windows",
+        "ads_open_design",
+        "ads_open_in_gui",
+        "ads_open_workspace",
+        "ads_place_component",
+        "ads_plot_sparams",
+        "ads_release_optimizer",
+        "ads_run_momentum",
+        "ads_run_simulation",
+        "ads_session_status",
+        "ads_set_instance_parameters",
+        "ads_set_mesh_visibility"
+      ],
+      "scope": "Synthetic built-in microstrip fixture, native build/edit/reopen; no GUI or solver launched"
+    },
+    "limitations": [
+      "No solver or GUI dispatched in the publication smoke test",
+      "Full ADS 2027 regression not performed",
+      "Retained tool names do not certify every tool operation"
+    ]
+  },
+  "historical_efficiency": {
+    "baseline_version": "0.4.0+ads2025.20261030.1",
+    "comparison_version": "0.4.0+ads2025.20261030.2",
+    "scope": "Prepared input: build, two edits and one rejected edit. Warm reuses one service; cold restarts between steps. Neither measures full RF design time.",
+    "samples": [
+      {
+        "kind": "baseline",
+        "mode": "warm",
+        "samples": 3,
+        "seconds": {
+          "median": 9.524027299999943,
+          "min": 9.385437599999932,
+          "max": 9.655609600000389
+        },
+        "calls": {
+          "median": 7,
+          "min": 7,
+          "max": 7
+        },
+        "response_bytes": {
+          "median": 5525,
+          "min": 5525,
+          "max": 5526
+        },
+        "service_starts": 1
+      },
+      {
+        "kind": "new",
+        "mode": "warm",
+        "samples": 3,
+        "seconds": {
+          "median": 8.124826100000064,
+          "min": 7.842305699999997,
+          "max": 9.08659120000084
+        },
+        "calls": {
+          "median": 4,
+          "min": 4,
+          "max": 4
+        },
+        "response_bytes": {
+          "median": 2158,
+          "min": 2157,
+          "max": 2158
+        },
+        "service_starts": 1
+      },
+      {
+        "kind": "baseline",
+        "mode": "cold",
+        "samples": 3,
+        "seconds": {
+          "median": 24.957092000000557,
+          "min": 24.18871129999934,
+          "max": 25.075626799998645
+        },
+        "calls": {
+          "median": 7,
+          "min": 7,
+          "max": 7
+        },
+        "response_bytes": {
+          "median": 5526,
+          "min": 5525,
+          "max": 5526
+        },
+        "service_starts": 4
+      },
+      {
+        "kind": "new",
+        "mode": "cold",
+        "samples": 3,
+        "seconds": {
+          "median": 25.58027410000068,
+          "min": 24.368521300000793,
+          "max": 27.108085299998493
+        },
+        "calls": {
+          "median": 4,
+          "min": 4,
+          "max": 4
+        },
+        "response_bytes": {
+          "median": 2158,
+          "min": 2157,
+          "max": 2158
+        },
+        "service_starts": 4
+      }
+    ],
+    "metadata": [
+      {
+        "kind": "baseline",
+        "version": "0.4.0+ads2025.20261030.1",
+        "instructions_utf8_bytes": 5056,
+        "initialize_utf8_bytes": 5492,
+        "tool_catalog_utf8_bytes": 75275,
+        "tools": 64,
+        "model_tokens": null,
+        "token_status": "unobserved"
+      },
+      {
+        "kind": "new",
+        "version": "0.4.0+ads2025.20261030.2",
+        "instructions_utf8_bytes": 1905,
+        "initialize_utf8_bytes": 2302,
+        "tool_catalog_utf8_bytes": 75438,
+        "tools": 64,
+        "model_tokens": null,
+        "token_status": "unobserved"
+      }
+    ],
+    "equivalent_netlist_graph_pairs": 18,
+    "all_equivalent": true,
+    "actual_tokens_observed": false,
+    "public_fixture_matches_historical_electrical_values": false
+  },
+  "historical_sp_workflow": {
+    "version": "0.4.0+ads2025.20261030.2",
+    "checks": [
+      {
+        "check": "JSONDecodeError",
+        "passed": true
+      },
+      {
+        "check": "precreation failure preserves correction path",
+        "passed": true
+      },
+      {
+        "check": "one native schematic built and reopened",
+        "passed": true
+      },
+      {
+        "check": "same request replays without another workspace",
+        "passed": true
+      },
+      {
+        "check": "snapshot reuse without full native re-extraction",
+        "passed": true
+      },
+      {
+        "check": "TASK_IDENTITY_MISMATCH",
+        "passed": true
+      },
+      {
+        "check": "REVISION_CONFLICT",
+        "passed": true
+      },
+      {
+        "check": "Another build owns this target",
+        "passed": true
+      },
+      {
+        "check": "CONCURRENT_TASK_EDIT",
+        "passed": true
+      },
+      {
+        "check": "all negative checks preserved native workspace",
+        "passed": true
+      },
+      {
+        "check": "SP submitted once with durable ID",
+        "passed": true
+      },
+      {
+        "check": "reserved",
+        "passed": true
+      },
+      {
+        "check": "original SP finished after client reconnection",
+        "passed": true
+      },
+      {
+        "check": "real SP matches independent series-R analytic result",
+        "passed": true
+      },
+      {
+        "check": "identical conditions reuse verified simulation evidence",
+        "passed": true
+      },
+      {
+        "check": "parameter edit keeps one target and verifies reopen",
+        "passed": true
+      },
+      {
+        "check": "old SP evidence is not reported for the changed schematic",
+        "passed": true
+      },
+      {
+        "check": "edit replay has no repeated mutation",
+        "passed": true
+      },
+      {
+        "check": "REQUEST_ID_CONFLICT",
+        "passed": true
+      },
+      {
+        "check": "reference plane differs",
+        "passed": true
+      },
+      {
+        "check": "changed circuit forces new solve",
+        "passed": true
+      },
+      {
+        "check": "edited SP matches independent analytic result",
+        "passed": true
+      },
+      {
+        "check": "explicit fresh verification bypasses cache",
+        "passed": true
+      },
+      {
+        "check": "fresh result equals prior same-condition result",
+        "passed": true
+      },
+      {
+        "check": "single final schematic and no active reservation",
+        "passed": true
+      }
+    ],
+    "fresh_same_condition_max_complex_s_difference": 0.0,
+    "fresh_same_condition_frequency_points": 3,
+    "scope": "Independent series-R linear SP and workflow guards; not nonlinear PA performance",
+    "rerun_for_publication": false
+  },
+  "historical_em_gui": {
+    "version": "0.4.0+ads2025.20261030.1",
+    "scope": "Built-in MLIN Layout/PSN, lookalike, planar Momentum microwave, native emModel, series-R/shunt-C SP, single-variable Gradient and owned GUI management",
+    "port_conditions": "Two ports, real 50 Ohm",
+    "rerun_for_publication": false,
+    "documentation": "EM-WORKFLOW.zh-CN.md"
+  },
+  "privacy": "Allowlisted summary only; native workspaces, raw runtime logs, process identifiers and machine paths are not published"
+}

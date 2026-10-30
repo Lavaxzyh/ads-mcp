@@ -140,7 +140,8 @@ class SchemaTests(unittest.IsolatedAsyncioTestCase):
         layout = next(tool for tool in tools if tool.name == "ads_create_layout")
         self.assertEqual(set(layout.inputSchema["required"]), {"lib", "cell", "shapes"})
         self.assertFalse(layout.inputSchema["$defs"]["LayoutShape"]["additionalProperties"])
-        self.assertEqual(server.mcp._mcp_server.version, "0.4.0")
+        from version import __version__
+        self.assertEqual(server.mcp._mcp_server.version, __version__)
 
 
 if __name__ == "__main__":

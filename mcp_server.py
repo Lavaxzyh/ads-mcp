@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ads-mcp: structured design and simulation tools for Keysight ADS.
 
-Built on keysight.ads.de (the official Python API shipped with ADS 2027).
+Based on upstream ads-mcp v0.4.0; this branch adapts the native API to ADS 2025.
 Circuit simulation and native Momentum simulation with an ADS GUI session.
 
 Run:  <ads-mcp>/.venv/Scripts/python.exe mcp_server.py   (stdio transport)
@@ -15,6 +15,9 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from runtime_identity import RuntimeIdentity
+_RUNTIME_IDENTITY = RuntimeIdentity(Path(__file__).resolve().parent)
+
 from mcp.server.fastmcp import FastMCP
 
 from ads_engine import AdsEngine, ensure_env, get_ads_install_dir, get_workroot, get_state_file
@@ -26,29 +29,33 @@ from circuit_runner import CircuitRunner
 
 _HERE = Path(__file__).resolve().parent
 
-INSTRUCTIONS = """Drive Keysight ADS (Advanced Design System) for
-RF/microwave schematic work.  Typical loop: ads_check_installed ->
-ads_create_workspace -> ads_create_library -> ads_create_schematic ->
-ads_place_component / ads_add_wire / ads_add_var / ads_add_term (build the
-schematic; the substrate instance is auto-named MSub1) -> ads_generate_netlist
--> ads_run_simulation (returns a task id; poll with ads_get_sim_status) ->
-ads_get_results / ads_plot_sparams / ads_export_touchstone.  Use
-ads_browse_components to discover library/cell/parameter names before placing
-unfamiliar parts.  Microstrip cells (MLIN, MSUB, MTEE, ...) live in
-`ads_tlines`; controllers and ports in `ads_simulation`; VAR/MeasEqn in
-`ads_datacmps`.  Simulation requires the schematic on file: the tools save
-automatically before netlisting. Build planar EM models in this server's
-workspace with ads_create_substrate, ads_create_layout, ads_add_layout_ports
-and ads_configure_momentum_setup, or use an existing saved native EM Setup.
-Save/close the server workspace, open it in ADS GUI, call ads_list_gui_sessions and
-ads_inspect_momentum_setup, then ads_run_momentum and poll ads_get_sim_status.
-Close any workspace owned by this server with ads_close_workspace before
-using the GUI Momentum path. Native schematic artwork conversion is available
-through ads_generate_layout; explicit polygons remain available through
-ads_create_layout. Use ads_configure_em_model, reload the workspace, and solve
-Momentum before loading the native model in a circuit testbench. GUI circuit
-simulation/optimization requires backend=gui, a selected session and target
-schematic. RFPro/FEM and arbitrary PDK conversion are not provided."""
+INSTRUCTIONS = """Drive Keysight ADS using verified local workflows. Default:
+ads_design_workflow(action=run), one independent task directory and one target
+schematic. Read SINGLE-SCHEMATIC.zh-CN.md beside this server. Reuse a private
+design_workflow_client.py session; build/import once, edit only requested fields,
+save/reopen and verify. Supply explicit topology, models, board, ports, reference
+planes and units. No historical engineering defaults. Originals remain read-only.
+Return compact receipts; full snapshots, netlists, logs and evidence stay in files.
+After a timeout inspect the same request/job ID; do not redispatch or cancel by
+assumption. Use operation=status for async SP. Never infer tokens from byte counts.
+
+Existing routes: DESIGN-WORKFLOW.zh-CN.md covers extraction, reviewed copies,
+capabilities, matching-result materialization and evidence comparisons;
+SCHEMATIC-WORKFLOW.zh-CN.md covers full BuildPlan. EM-WORKFLOW.zh-CN.md covers
+native ADS 2025 artwork/PSN/lookalike, Momentum, emModel and bounded Gradient
+optimization. Native EM needs an identified task-owned GUI; never attach to or
+stop arbitrary user sessions. Native MaxIters is not a hard EM-solve-count budget.
+RF-WORKFLOWS.zh-CN.md and RF-ADVANCED.zh-CN.md cover Load-pull analysis, matching
+search, frequency targets and tolerances. RF-JOBS.zh-CN.md covers durable jobs,
+compact wait/status and paginated detail. Keep task/workspace ownership isolated.
+
+Run ads_runtime_selfcheck when starting a task or after deployment. Report stale
+code/catalog, unsupported inputs and repeated adapter gaps; do not turn routine
+design into unlimited tool development. Simulation requires explicit scope and
+authorization. Structural acceptance, SP, EM, nonlinear HB and measurements are
+different evidence. Metadata, initial values or SP do not establish PA power,
+PAE or stability. No Computer Use, global ADS changes or other-session restarts.
+"""
 
 mcp = FastMCP("ads-mcp", instructions=INSTRUCTIONS)
 # FastMCP does not expose the server version; report ours instead of the SDK's
@@ -92,6 +99,75 @@ def ads_check_installed() -> dict[str, Any]:
         return _ok(**engine.check_installed())
     except Exception as exc:  # noqa: BLE001
         return _err(exc)
+
+
+@mcp.tool()
+def ads_runtime_selfcheck(client_tool_names: list[str] | None = None,
+                          disabled_tools: list[str] | None = None,
+                          expected_build_id: str | None = None) -> dict[str, Any]:
+    """Identify this running build, disk changes, ADS environment and optional client catalog.
+
+    Read-only. Pass actual client tool names to detect an old/filtered catalog;
+    declare intentional exclusions with disabled_tools. Never restarts sessions.
+    """
+    report = _RUNTIME_IDENTITY.report(mcp._tool_manager._tools.keys(),
+        client_tool_names=client_tool_names, disabled_tools=disabled_tools,
+        expected_build_id=expected_build_id)
+    install = get_ads_install_dir()
+    try:
+        report['ads'] = engine.check_installed()
+        from ads_engine import get_de
+        de = get_de()
+        report['ads']['native_product_version'] = str(de.product_version())
+        report['ads']['python_de_version'] = str(getattr(de, '__version__', 'unknown'))
+    except Exception as exc:
+        report['ads'] = {'ok': False, 'install': str(install), 'error': str(exc)}
+    import importlib.util
+    modules={name:importlib.util.find_spec(name) is not None for name in ('mcp','pydantic','numpy','pandas','psutil','win32com','pythoncom')}
+    report['dependencies'] = {'official_gui_bridge': (install/'bin/ads-mcp.exe').is_file(),
+        'managed_ads2025_bridge': (Path(__file__).parent/'gui_bridge_bootstrap.py').is_file(),
+        'mcp_python_packages':modules,'missing_mcp_packages':[n for n,present in modules.items() if not present],
+        'note':'The MCP virtualenv and native ADS GUI Python are separate interpreters; managed GUI code uses native ADS/PySide2 plus stdlib.'}
+    from gui_bridge_2025 import discover
+    report['owned_gui_sessions']=discover()
+    report['known_limits'] = [
+        'ADS 2025 native paths require a task-owned managed GUI and workspace; arbitrary existing ADS GUIs are not attached or stopped.',
+        'Native emModel testbench/candidate/Gradient optimizer constructors currently support two-port, real 50-ohm linear SP; one-variable microstrip optimization is end-to-end verified.',
+        'Native MaxIters limits optimizer iterations, not EM solve count. Cache parameter resolution is distinct from geometric grid precision.',
+        'Layout generation reports omitted artwork. Package footprints, nonlinear PA HB, custom PDK and external substrate dependencies need case-specific validation.',
+        'Existing loaded EM Setup changes may require workspace reopen; native pre-save rejects unexpected explicit-setting changes.',
+        'A timed-out or failed native task may retain a workspace reservation; inspect the original job before recovery. No automatic redispatch or forced cancellation.',
+    ]
+    return _ok(**report)
+
+
+@mcp.tool()
+def ads_manage_gui_session(action: str, task_directory: str = '', workspace: str = '',
+                           session_id: int | None = None) -> dict[str, Any]:
+    """Start/list/stop only task-owned ADS 2025 GUI sessions in independent workspaces.
+
+    start requires a workspace contained inside task_directory. Never attaches
+    to arbitrary pre-existing ADS GUIs. Stop only after all owned tasks finish.
+    """
+    from gui_bridge_2025 import start_session, discover, ManagedAdsClient
+    if action == 'list':
+        return _ok(sessions=discover())
+    if action == 'start':
+        if engine.workspace_path is not None:
+            raise RuntimeError('Close the MCP-owned workspace before opening a dedicated GUI')
+        if not task_directory or not workspace:
+            raise ValueError('task_directory and workspace are required')
+        return _ok(**start_session(task_directory,workspace))
+    if action == 'stop':
+        _ensure_no_running_tasks()
+        if session_id is None:
+            raise ValueError('session_id is required')
+        with ManagedAdsClient() as client:
+            client.call('connect_session',{'session_id':session_id})
+            from workspace_activity import assert_idle
+            assert_idle(client.record['workspace'])
+            return _ok(**client.call('shutdown_owned',{}))
+    raise ValueError('action must be start, list or stop')
 
 
 @mcp.tool()
@@ -174,7 +250,7 @@ def ads_browse_components(lib: str = "") -> dict[str, Any]:
 
     Call without `lib` to enumerate all standard libraries; with `lib` to list
     that library's cells.  Microstrip parts live in `ads_tlines`, controllers
-    and ports in `ads_simulation`, VAR/MeasEqn in `ads_datacmps`.
+    ports and MeasEqn in `ads_simulation`, VAR in `ads_datacmps`.
     """
     try:
         return _ok(**engine.browse_components(lib.strip() or None))
@@ -363,6 +439,13 @@ def ads_get_sim_status(task_id: str) -> dict[str, Any]:
     the solver. A bridge timeout is uncertain dispatch, never a retry signal.
     """
     try:
+        if task_id.startswith("rf_"):
+            from rf_jobs import JobStore
+            result=JobStore().status(task_id,full=True)
+            native_status=result["status"]
+            result["job_status"]=native_status
+            result["status"]="done" if native_status=="completed" else "running" if native_status in {"queued","running","paused"} else "error"
+            return result
         st = state.task_status(task_id)
         if st["kind"] == "momentum":
             st = momentum.poll(state, task_id, engine.validate_momentum_dataset)
@@ -378,7 +461,7 @@ def ads_get_sim_status(task_id: str) -> dict[str, Any]:
 
 @mcp.tool()
 def ads_list_gui_sessions() -> dict[str, Any]:
-    """Discover running ADS GUI sessions through installed Keysight ads-mcp.exe.
+    """Discover GUI sessions through the official bridge or the owned ADS 2025 registry.
 
     Returns session IDs and workspace paths. Does not start or close ADS.
     """
@@ -388,9 +471,15 @@ def ads_list_gui_sessions() -> dict[str, Any]:
         return _err(exc)
 
 
-def _model_operation(lib: str, operation: str, **data) -> dict[str, Any]:
+def _model_operation(lib: str, operation: str, *, session_id: int | None = None, workspace: str = "", **data) -> dict[str, Any]:
     try:
         _ensure_no_running_tasks()
+        if session_id is not None:
+            if engine.workspace_path is not None:
+                raise StateError("close this server's workspace before modeling in the selected GUI")
+            if not workspace:
+                raise ValueError("An explicit workspace is required for GUI modeling")
+            return _ok(**em_modeler.execute(workspace, lib, operation, session_id=session_id, **data))
         if engine.workspace_path is None:
             raise StateError("open a workspace with ads_create_workspace or ads_open_workspace before modeling")
         with engine._op():
@@ -452,7 +541,8 @@ def ads_add_layout_ports(lib: str, cell: str,
 @_serialize_workspace
 def ads_configure_momentum_setup(lib: str, cell: str,
                                   substrate: str, start_ghz: float, stop_ghz: float, points: int,
-                                  view: str = "layout", setup: str = "emSetup") -> dict[str, Any]:
+                                  view: str = "layout", setup: str = "emSetup",
+                                  session_id: int | None = None, workspace: str = "") -> dict[str, Any]:
     """Create/link a native Momentum setup from the local ADS RFBoard template.
 
     Uses existing local layout and substrate, a single linear frequency sweep,
@@ -465,6 +555,7 @@ def ads_configure_momentum_setup(lib: str, cell: str,
     closing the server workspace and opening the saved workspace in ADS GUI.
     """
     return _model_operation(lib, "setup", cell=cell, view=view,
+                            session_id=session_id, workspace=workspace,
                             substrate=substrate, start_ghz=start_ghz, stop_ghz=stop_ghz,
                             points=points, setup=setup, dataset=cell,
                             impedance_ohms=50.0)
@@ -477,7 +568,7 @@ def ads_inspect_momentum_setup(workspace: str, setup_file: str, setup: str = "em
     setup_file is the canonical emStateFile.xml inside the EM Setup cellview,
     not the generated copy under simulation/. Requires an existing local
     library and saved layout, native calculation type 5 and one linear sweep
-    (verified on ADS 2027). Reports stale copied workspace references; no edits.
+    (also verified locally on ADS 2025). Reports stale copied workspace references; no edits.
     """
     try:
         return _ok(**inspect_setup(workspace, setup_file, setup))
@@ -620,6 +711,15 @@ def ads_open_in_gui(workspace: str = "") -> dict[str, Any]:
 from native_tools import register as _register_native_tools
 _register_native_tools(mcp, engine, state)
 
+from workflow_tools import register as _register_workflow_tools
+_register_workflow_tools(mcp, engine, state, _workspace_dispatch_lock)
+
+from schematic_flow import register as _register_schematic_flow
+_register_schematic_flow(mcp, engine, state, _workspace_dispatch_lock)
+
+from design_workflow import register as _register_design_workflow
+_register_design_workflow(mcp, engine, state, _workspace_dispatch_lock)
+
 if __name__ == "__main__":
     ensure_env()
     # import the native de engine on the MAIN thread: _pde/Qt must not be
@@ -627,6 +727,11 @@ if __name__ == "__main__":
     from ads_engine import get_de
 
     get_de()
+    # ADS 2025's bundled SciPy BLAS extension can block on first import once
+    # the stdio transport has reader threads. Load it on the main thread
+    # before starting MCP, as with the native DE engine above.
+    import scipy.spatial
+
     mcp.run()
     # the de engine leaves Qt threads behind; without a hard exit the process
     # would hang after stdin EOF and block every MCP client's shutdown
