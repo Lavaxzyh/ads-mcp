@@ -79,7 +79,7 @@ def build_em_testbench(a):
         result={}
         for p in inst.inst_pins:
             if p.inst_term.is_numbered:
-                result[p.inst_term.get_inst_term_number()]=p.snap_point
+                result[(p.inst_term.term_number if hasattr(p.inst_term, "term_number") else p.inst_term.get_inst_term_number())]=p.snap_point
         return result
     def point(p):return (float(p.x),float(p.y))
     def connect(p,q):
@@ -238,7 +238,7 @@ def build_em_candidate(a):
     dut=d.add_instance((a['lib'],a['cell'],a['symbol']),(0.,0.),name='DUT')
     dut.specialized_subview='schematic'
     for name,value in a['parameters'].items():dut.parameters[name].value=format(value,'.15g')
-    pins={p.inst_term.get_inst_term_number():p for p in dut.inst_pins if p.inst_term.is_numbered}
+    pins={(p.inst_term.term_number if hasattr(p.inst_term, "term_number") else p.inst_term.get_inst_term_number()):p for p in dut.inst_pins if p.inst_term.is_numbered}
     for n in (1,2):
         p=pins[n];net=p.inst_term.net or d.find_or_add_net('P'+str(n))
         p.inst_term.net=net;term=d.add_term(net,'P'+str(n));term.number=n

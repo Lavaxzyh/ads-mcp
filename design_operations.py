@@ -134,7 +134,7 @@ def design_operation(a):
             pin = finder(a["pin_number"])
         else:
             pin = next((p for p in inst.inst_pins if p.inst_term.is_numbered
-                        and p.inst_term.get_inst_term_number() == a["pin_number"]), None)
+                        and (p.inst_term.term_number if hasattr(p.inst_term, "term_number") else p.inst_term.get_inst_term_number()) == a["pin_number"]), None)
         if pin is None or not pin.is_valid or pin.snap_point is None:
             raise ValueError("Instance has no valid pin numbered " + str(a["pin_number"]))
         with de.db.Transaction(source, "Add connected Subnetwork terminal") as tx:
@@ -176,7 +176,7 @@ def design_operation(a):
                     errors[param.name] = str(exc)
             for pin in inst.inst_pins:
                 term = pin.inst_term
-                pins.append({"number": term.get_inst_term_number() if term.is_numbered else None,
+                pins.append({"number": (term.term_number if hasattr(term, "term_number") else term.get_inst_term_number()) if term.is_numbered else None,
                              "point": [float(pin.snap_point.x), float(pin.snap_point.y)] if pin.snap_point is not None else None,
                              "net": term.net.name if term.net else None})
             row = {"name": inst.name, "library": inst.library_name, "cell": inst.cell_name,

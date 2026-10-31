@@ -238,7 +238,7 @@ def native_pins(design):
             term = pin.inst_term
             if not term.is_numbered or pin.snap_point is None:
                 raise ValueError('Unsupported unnumbered/unsnapped pin on ' + inst.name)
-            key = inst.name + ':' + str(term.get_inst_term_number())
+            key = inst.name + ':' + str((term.term_number if hasattr(term, "term_number") else term.get_inst_term_number()))
             if key in out:
                 raise ValueError('Multiple physical pins for ' + key)
             out[key] = pin

@@ -135,7 +135,7 @@ def read_design(design, contract=None):
             row['variables']=read(inst.name+'.variables',lambda:dict(inst.vars))
         for i,pin in enumerate(inst.inst_pins):
             term=pin.inst_term
-            number=read(f'{inst.name}.pins[{i}].number',lambda:term.get_inst_term_number() if term.is_numbered else None)
+            number=read(f'{inst.name}.pins[{i}].number',lambda:(term.term_number if hasattr(term, "term_number") else term.get_inst_term_number()) if term.is_numbered else None)
             ref=inst.name+':'+str(number) if number is not None else inst.name+':unnumbered_'+str(i)
             xy=read(ref+'.point',lambda:[float(pin.snap_point.x),float(pin.snap_point.y)])
             net=term.net.name if term.net is not None else None

@@ -60,7 +60,7 @@ def capture(design,directory):
                                      'parameters':{},'observed_forms':{},'write_verification':'Not inferred from metadata; see actual build/revision receipts'})
         record['orientations'].add(inst.orient.name)
         for pin in inst.inst_pins:
-            if pin.inst_term.is_numbered:record['pins'].add(pin.inst_term.get_inst_term_number())
+            if pin.inst_term.is_numbered:record['pins'].add((pin.inst_term.term_number if hasattr(pin.inst_term, "term_number") else pin.inst_term.get_inst_term_number()))
         for p in inst.parameters:
             if p.name not in record['parameters']:
                 field={'native_type':type(p).__name__,'repeated':hasattr(p,'repeats')}
