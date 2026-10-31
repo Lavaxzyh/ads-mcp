@@ -6,6 +6,15 @@ import json
 from pathlib import Path
 
 
+def active_workspace(arguments):
+    """Read the actual workspace in the selected local or GUI DE process."""
+    from pathlib import Path
+    from keysight.ads import de
+    if not de.workspace_is_open():
+        raise RuntimeError("Open a workspace in the selected ADS process before editing")
+    return {"workspace": str(Path(de.active_workspace().path).resolve())}
+
+
 def call_native(operation, arguments: dict, session_id: int | None = None,
                 workspace: str = "", timeout: float = 55):
     """Execute our own operation on the ADS main thread, locally or via bridge.
@@ -25,6 +34,7 @@ def call_native(operation, arguments: dict, session_id: int | None = None,
     from ads_engine import get_ads_install_dir
     from momentum import OfficialAdsClient
     payload = json.dumps({"arguments": arguments, "workspace": workspace}, ensure_ascii=True)
+    dependencies="\n".join(inspect.getsource(fn) for fn in getattr(operation,'__ads_mcp_dependencies__',()))
     code = f'''import json
 from pathlib import Path
 from keysight.ads import de
@@ -32,6 +42,7 @@ _request = json.loads({payload!r})
 if _request["workspace"]:
     if not de.workspace_is_open() or Path(de.active_workspace().path).resolve() != Path(_request["workspace"]).resolve():
         raise RuntimeError("Selected ADS GUI uses another workspace; no workspace was switched")
+{dependencies}
 {inspect.getsource(operation)}
 _answer = {operation.__name__}(_request["arguments"])
 print("ADS_NATIVE_JSON:" + json.dumps(_answer, ensure_ascii=True))

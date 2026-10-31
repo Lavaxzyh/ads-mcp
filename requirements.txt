@@ -1,0 +1,7 @@
+mcp>=1,<2
+pydantic>=2,<3
+numpy
+pandas
+matplotlib
+psutil
+pywin32; sys_platform == "win32"

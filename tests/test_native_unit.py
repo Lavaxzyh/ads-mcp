@@ -1,5 +1,6 @@
 """Behavioral regressions for v0.4 model plans, cache tasks and N-port data."""
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -109,14 +110,16 @@ class CircuitMonitorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             class Window:
                 def isVisible(self):return True
-                def windowTitle(self):return 'tb [lib:tb:schematic]'
+                def windowTitle(self):return 'tb [lib:tb:schematic] (Schematic):7'
                 def findChildren(self,_):return [action]
                 def raise_(self):pass
                 def activateWindow(self):pass
             action=SimpleNamespace(objectName=lambda:'Simulate',isEnabled=lambda:True)
             w=Window();app=SimpleNamespace(topLevelWidgets=lambda:[w],processEvents=lambda:None,activeWindow=lambda:w)
-            timer=Mock();de=SimpleNamespace(ael=SimpleNamespace(db_find_design_context_from_name=Mock(),de_analyze=Mock()))
-            modules={'keysight':SimpleNamespace(ads=SimpleNamespace(de=de)),'keysight.ads':SimpleNamespace(de=de),
+            timer=Mock();de=SimpleNamespace(ael=SimpleNamespace(db_get_design_context_from_name=Mock(),de_analyze=Mock(),
+                api_set_current_window_by_seq_num=Mock(),de_get_current_design_context=Mock(),db_get_design_name=Mock(return_value='lib:tb:schematic')))
+            ael=SimpleNamespace(decl=SimpleNamespace(APPEND_DSN_MODE=2,READ_ONLY_DSN_MODE=0))
+            modules={'keysight':SimpleNamespace(ads=SimpleNamespace(de=de,ael=ael)),'keysight.ads':SimpleNamespace(de=de,ael=ael),
                      'PySide6':SimpleNamespace(),'PySide6.QtWidgets':SimpleNamespace(QApplication=SimpleNamespace(instance=lambda:app),QMainWindow=Window),
                      'PySide6.QtGui':SimpleNamespace(QAction=object),'PySide6.QtCore':SimpleNamespace(QTimer=SimpleNamespace(singleShot=timer)),
                      'shiboken6':SimpleNamespace(isValid=lambda _:True)}
@@ -126,6 +129,7 @@ class CircuitMonitorTests(unittest.TestCase):
                 self.assertEqual(len(app._ads_mcp_dispatches),1)
                 timer.call_args.args[1]()
                 de.ael.de_analyze.assert_called_once()
+                de.ael.api_set_current_window_by_seq_num.assert_called_once_with(7)
                 self.assertFalse(app._ads_mcp_dispatches)
             self.assertTrue(json.loads(marker.read_text())['dispatched'])
 
@@ -141,15 +145,27 @@ class CircuitMonitorTests(unittest.TestCase):
     def test_release_retains_best_values_without_applying_to_design(self):
         with tempfile.TemporaryDirectory() as tmp:
             state=SessionState(Path(tmp)/'state.json')
-            tid=state.create_external_task('gui_circuit',dict(session_id=1,workspace=tmp,mode='optimize'))
+            tid=state.create_external_task('gui_circuit',dict(session_id=1,workspace=tmp,mode='optimize',design='lib:tb:schematic',folder=tmp))
             with self.assertRaises(ValueError):CircuitRunner().release(state,tid)
-            state.update_external_task(tid,status='done',result={'optimal_parameters':{'Wm':.7}})
-            with patch('circuit_runner.call_native',return_value={'simulator_released':True,'schematic_parameters_modified':False}) as native:
+            ds=Path(tmp)/'result.ds';ds.write_bytes(b'unit dataset')
+            state.update_external_task(tid,status='done',result={'optimal_parameters':{'Wm':.7},'dataset':str(ds),'dataset_sha256':hashlib.sha256(ds.read_bytes()).hexdigest()})
+            with patch('circuit_runner.call_native',return_value={'simulator_released':True,'schematic_parameters_modified':False,'cockpit_closed':[True],'cockpit_close_required':False}) as native:
                 result=CircuitRunner().release(state,tid)
                 self.assertEqual(result['optimal_parameters'],{'Wm':.7})
                 self.assertFalse(result['schematic_parameters_modified'])
                 CircuitRunner().release(state,tid)
                 self.assertEqual(native.call_count,1)
+
+    def test_release_resumes_pending_close_without_releasing_simulator_twice(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state=SessionState(Path(tmp)/'state.json')
+            tid=state.create_external_task('gui_circuit',dict(session_id=1,workspace=tmp,mode='optimize',design='lib:tb:schematic',folder=tmp))
+            ds=Path(tmp)/'result.ds';ds.write_bytes(b'unit dataset')
+            state.update_external_task(tid,status='done',result={'optimal_parameters':{'Wm':.7},'dataset':str(ds),'dataset_sha256':hashlib.sha256(ds.read_bytes()).hexdigest()})
+            Path(tmp,'optimizer-release.json').write_text(json.dumps({'design':'lib:tb:schematic','simulator_released':True,'cockpit_closed':[False],'cockpit_close_required':True}),encoding='utf-8')
+            with patch('circuit_runner.call_native',return_value={'simulator_released':True,'cockpit_closed':[True],'cockpit_close_required':False}) as native:
+                CircuitRunner().release(state,tid)
+                self.assertTrue(native.call_args.args[1]['already_released'])
 
 
 if __name__ == "__main__":

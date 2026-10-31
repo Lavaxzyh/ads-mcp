@@ -1,2 +1,5 @@
-"""Single source for the server and GUI bridge client version."""
-__version__ = "0.4.0"
+"""Upstream identity and independently versioned ADS 2025 local release."""
+UPSTREAM_VERSION = "0.4.0"
+UPSTREAM_COMMIT = "72e2793e0ebe8022903608e84cdb900f17ae81c0"
+LOCAL_RELEASE = "ads2025-share-20261030.3"
+__version__ = "0.4.0+ads2025.20261030.3"

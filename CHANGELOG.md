@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0+ads2025.20261030.3 — ADS 2025 contribution branch
+
+- Preserve the upstream v0.4.0 tool names and native workflow foundation; add ADS 2025 compatibility and task-owned GUI support.
+- Include the existing Load-pull, matching search, tolerance, bounded HB review, native EM, durable RF jobs and single-schematic workflows developed on this branch.
+- Make ADS installation resolution configurable across the three CLI clients and remove maintainer-specific paths from the publication copy.
+- Provide synthetic public schematic inputs, explicit validation boundaries and source/runtime privacy guidance.
+- Publication checks: 201 unit tests and a real ADS 2025 build/edit/save/reopen smoke test. Historical SP/EM evidence is identified separately; full ADS 2027 regression was not performed.
+
 ## Unreleased
 
 ### Repository traffic

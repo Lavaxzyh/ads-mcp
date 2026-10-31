@@ -1,265 +1,108 @@
-# ads-mcp
+# ads-mcp：ADS 2025 功放工作流分支
 
-![Clones](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones.json) ![Views](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/views.json) ![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/installs.json)
+[English](README.md) · [原作者项目](https://github.com/Lavaxzyh/ads-mcp) · [MIT 许可](LICENSE)
 
-**ads-mcp v0.4.0** 提供 49 个 Keysight ADS MCP 工具，核心流程是 **原理图 → 原生 Layout → Momentum → 原生 emModel → 电路联合仿真**。
+这是基于 **Lavaxzyh/ads-mcp v0.4.0** 的 **ADS 2025 适配与射频功放工作流增强分支**，维护目标为 **`feature/power-amplifier`**。继承原作者的原理图、原生 Layout、Momentum、emModel 和联合仿真基础，保留上游 **49 个工具名称**，当前实际注册 **64 个工具**。
 
-[English](README.md) · 简体中文
+分支版本：**`0.4.0+ads2025.20261030.3`**，标识 `ads2025-share-20261030.3`。它不是原作者主线的新版本。实现基于上游 `72e2793`，此次提交基线为 `0181a5b`；后者只追加了 README 徽章修正。
 
-[![Python](https://img.shields.io/badge/Python-3.14_(ADS%E8%87%AA%E5%B8%A6)-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![MCP](https://img.shields.io/badge/Protocol-MCP_stdio-8A2BE2)](https://modelcontextprotocol.io/) [![ADS](https://img.shields.io/badge/Tested_on_Keysight_ADS_2027-red)](https://www.keysight.com/) [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE) [![Tools](https://img.shields.io/badge/%E5%B7%A5%E5%85%B7%E6%95%B0-49-4c1)](docs/v040-tools.md)
+本分支先独立维护 ADS 2025 兼容处理和功放相关工作流，后续与作者协作整合。重点是可靠执行已有设计、分析和验证步骤，不能替代工程判断，也不是 Keysight 官方产品。
 
-> 本版包含原生 artwork 与 EM/电路联合仿真、完整金属区域的参数化天线优化、官方厂商模型下载/导入三条主线。另提供网格加密配置和在指定 ADS 进程中执行的 PySide6 窗口管理。电路仿真默认仍使用独立 `hpeesofsim` 后端。
->
-> 本项目采用 MIT 许可证，是第三方独立项目，不是 Keysight 官方产品。ADS 软件、专有模板、厂商库和论文 PDF 不随仓库分发。
+## 相对原项目的适配与强化
 
-## Python API 与依赖包
+| 方向 | 本分支内容 | 适用边界 |
+|---|---|---|
+| ADS 2025 兼容 | 原生 API 差异适配、Python 3.12/PySide2、有认证的专用 GUI 桥接 | Windows ADS 2025 实测；不接管任意用户窗口 |
+| 上游原有工具 | 原理图、原生 Layout/PSN、lookalike、Momentum、emModel 和部分联合仿真 | 保留名称不等于所有版本、元件与操作都已验证 |
+| Load-pull 分析 | 保存点全量导出、明确条件比较、Pout/PAE/增益筛选、分频阻抗区域 | 实际保存点与插值分开；数值有效不等于 HB 收敛 |
+| 匹配网络搜索 | 批扫、频变目标、预算粗细搜索、标称值/尺寸约束、保守缓存 | 明确两端口 SP 条件；不把匹配评分当作非线性功放性能 |
+| 敏感度与容差 | 单参数扰动、角点、固定种子蒙特卡洛 | 指定参数及独立分布假设，不等于实测良率 |
+| 已有 HB 复核 | 受支持模板的明确工作点、候选参数及指标复核 | 需要使用者提供模型、探针、端接与授权；不是任意 HB/PDK 自动生成 |
+| 单原理图工作流 | 短模板、一次导入、同副本增量修改、变更清单、保存重开、简短摘要 | 原工程只读，不擅自改变拓扑、板材、端口、参考面和单位 |
+| 长任务与隔离 | 稳定请求/任务 ID、工作区锁、状态等待、RF 检查点和有限重试 | 超时先核对原任务，不自动重派或终止其他会话 |
+| 版本与自检 | 加载代码/磁盘版本区分、实际工具目录及依赖检查 | 不自动重启其他客户端或 ADS 会话 |
 
-- **已验证环境：Windows、ADS 2027 v6.5.0、ADS 自带 Python 3.14**，需有效的 ADS/Momentum 许可证；其他版本和平台尚未验证。
-- 使用 ADS 解释器创建虚拟环境并复用其 Python 包，以匹配 cp314 原生模块。Keysight 包由本机 ADS 安装提供。
-- MCP 客户端需支持 stdio，如 Claude Desktop、ZCode 或 Cursor。
-- Momentum、GUI 联合仿真和 Optim 依赖本机官方 `bin/ads-mcp.exe` 桥接及打开目标工程的 ADS GUI 会话；EM 求解还需已保存的原生 EM Setup。
-
-| Python 包 | 来源与用途 |
-|---|---|
-| `keysight.ads.de` | ADS 内置：工作区、设计库、原理图、Layout 与 AEL 接口。 |
-| `keysight.ads.subst` | ADS 内置：介质叠层、导体与过孔映射。 |
-| `keysight.ads.dataset` | ADS 内置：读取仿真数据集。 |
-| `keysight.edatoolbox` | ADS 环境提供：网表与电路仿真调用。 |
-| `PySide6` | 使用 ADS 配套版本：在 GUI 进程中管理窗口与 Qt 回调。 |
-| `mcp<2` | pip 安装：MCP 服务与 stdio 通信。 |
-| `numpy`、`pandas`、`matplotlib` | pip 安装或复用环境：数值计算、数据整理与绘图。 |
+代码保留适用的 ADS 2027 官方桥接路径，但**本分支未完成 ADS 2027 全量回归**。原作者在 ADS 2027 上的验证与本分支的 ADS 2025 验证应分别理解，不能写成“全版本通用”。详见 [验证摘要](docs/VALIDATION.zh-CN.md)。
 
 ## 安装与配置
 
-下方 `<ADS_INSTALL>`、`<REPO>` 等为通用路径占位符，请替换为自己的路径。
+需要已授权的 Windows ADS 2025。原生验证环境为 ADS 2025 `610.shp`、ADS Python 3.12.2、PySide2 5.15.10。Keysight Python 模块必须来自对应安装，不随源码分发；不要复制其他 ADS 版本的原生模块来绕过兼容要求。
 
-```text
-git clone https://github.com/Lavaxzyh/ads-mcp.git
+以下占位符须替换为自己的绝对路径，运行输出放在仓库之外。
+
+```powershell
+git clone --branch feature/power-amplifier https://github.com/Lavaxzyh/ads-mcp.git
 cd ads-mcp
-<ADS_INSTALL>/tools/python/python.exe -m venv --system-site-packages .venv
-.venv/Scripts/python.exe -m pip install "mcp<2" pandas numpy matplotlib
+& '<ADS_INSTALL>/tools/python/python.exe' -m venv --system-site-packages .venv
+& '.venv/Scripts/python.exe' -m pip install -r requirements.txt
 ```
 
-MCP 客户端配置：
+在作者合并本次贡献之前，应使用贡献者 Fork 地址或已审核源码包，不能假定上游分支已经包含这些代码。
 
 ```json
 {
   "mcpServers": {
     "ads-mcp": {
       "command": "<REPO>/.venv/Scripts/python.exe",
-      "args": ["<REPO>/mcp_server.py"],
+      "args": ["-B", "<REPO>/mcp_server.py"],
       "env": {
         "HPEESOF_DIR": "<ADS_INSTALL>",
-        "ADS_MCP_WORKROOT": "<USER_OUTPUT>"
+        "ADS_MCP_WORKROOT": "<OUTPUT_ROOT>",
+        "ADS_MCP_STATE_FILE": "<OUTPUT_ROOT>/.ads-mcp/session_state.json"
       }
     }
   }
 }
 ```
 
-| 配置项 | 用途与默认值 |
-|---|---|
-| `HPEESOF_DIR` | ADS 安装目录，默认是系统 Program Files 下的 `Keysight/ADS2027`。 |
-| `ADS_MCP_WORKROOT` | 用户输出根目录，默认是用户主目录下的 `ads_mcp_demo`。 |
-| `ADS_MCP_STATE_FILE` | 可选任务状态 JSON，默认是 `<USER_OUTPUT>/.ads-mcp/session_state.json`，位于仓库之外。 |
+- `HPEESOF_DIR` 优先于默认值，默认候选为系统 Program Files 下的 `Keysight/ADS2025`。三个命令行客户端采用同一解析规则。
+- `ADS_MCP_WORKROOT` 是工作输出根目录，`ADS_MCP_STATE_FILE` 是可选状态文件。
+- Momentum、GUI 联合仿真等需要对应许可和本任务专用会话；仓库不提供 ADS 本体、许可证或第三方模型。
+- 运行单元测试时另安装 `requirements-test.txt` 中的依赖。
 
-运行状态在使用时生成，仓库不包含 `state/` 或 `promo/` 目录。已有任务可通过原来的 `ADS_MCP_STATE_FILE` 继续查询；默认位置调整不会迁移或丢弃旧状态。
+## 推荐用法：一次一个原理图
 
-## 工具列表：49 个
-
-下方列出**全部已注册工具**，包含 v0.4.0 新增的 17 个工具。详细参数结构由 MCP `tools/list` 返回；原生操作的补充说明见 [v0.4.0 工具](docs/v040-tools.md)。
-
-### 环境与工作区 (7)
-
-| 工具 | 作用 |
-|---|---|
-| `ads_check_installed` | 检查 ADS 安装、仿真器和 DE 引擎。 |
-| `ads_create_workspace` | 创建或打开工作区。 |
-| `ads_open_workspace` | 打开已有工作区。 |
-| `ads_close_workspace` | 关闭 MCP 持有的工作区。 |
-| `ads_session_status` | 查询会话与持久化任务状态。 |
-| `ads_open_in_gui` | 在 ADS GUI 打开已保存工作区。 |
-| `ads_list_gui_sessions` | 通过官方桥接发现 GUI 会话和工作区标识。 |
-
-### 原理图和 Subnetwork 构建 (13)
-
-| 工具 | 作用 |
-|---|---|
-| `ads_create_library` | 创建并挂接设计库。 |
-| `ads_create_schematic` | 创建原理图并设为后续调用的当前设计。 |
-| `ads_open_design` | 检查已有视图，可在指定 GUI 中显示。 |
-| `ads_browse_components` | 查询已安装库、cell 和已知参数。 |
-| `ads_place_component` | 按朝向和参数放置器件。 |
-| `ads_set_instance_parameters` | 修改已有参数，可显式选择仿真视图。 |
-| `ads_add_wire` | 添加导线，可设置 net 名称。 |
-| `ads_add_var` | 添加 VAR，可设置优化范围。 |
-| `ads_add_term` | 放置带接地的仿真 Term，与层次端子不同。 |
-| `ads_add_design_port` | 在实例引脚的实际 net 上添加 Subnetwork 端子。 |
-| `ads_add_ground` | 放置接地符号。 |
-| `ads_define_cell_parameters` | 在 itemdef.py 持久化 REAL/NO_UNIT Subnetwork 形式参数。 |
-| `ads_list_instances` | 列出当前原理图实例。 |
-
-### 原生 Layout 和衬底 (6)
-
-| 工具 | 作用 |
-|---|---|
-| `ads_create_substrate` | 创建介质、导体映射、可选底部地和过孔映射。 |
-| `ads_create_layout` | 使用毫米坐标创建矩形/多边形几何。 |
-| `ads_generate_layout` | 使用 update_design_from 从原理图原生生成/更新 Layout，可设置 PSN PCell。 |
-| `ads_add_layout_ports` | 添加编号版图 pin 和 net，保留已有几何。 |
-| `ads_generate_symbol` | 生成 Dual/Quad 矩形符号或原生 Layout-lookalike 符号。 |
-| `ads_configure_momentum_setup` | 创建关联本地 Layout 和衬底的原生微波 Setup。 |
-
-### Momentum 和 emModel (7)
-
-| 工具 | 作用 |
-|---|---|
-| `ads_inspect_momentum_setup` | 检查已保存的 Layout 关联、微波模式、频率计划和运行锁。 |
-| `ads_run_momentum` | 通过指定 GUI 会话派发一次校验后的原生求解。 |
-| `ads_configure_momentum_mesh` | 设置每波长网格数、边缘网格和可选参考频率。 |
-| `ads_configure_momentum_options` | 设置一段线性 RF 扫频、可选独立 DC 点和 Auto/TML/None 端口馈电。 |
-| `ads_configure_em_model` | 配置原生模型自动创建/更新；重载并求解后生成数据。 |
-| `ads_inspect_em_model` | 检查原生文件、参数名、样本缓存和几何插值。 |
-| `ads_configure_em_parameters` | 设置几何插值/缓存分辨率，不删除样本。 |
-
-### 电路仿真和原生优化 (6)
-
-| 工具 | 作用 |
-|---|---|
-| `ads_generate_netlist` | 生成当前原理图网表以供检查。 |
-| `ads_run_simulation` | 默认运行独立仿真，也可显式运行 GUI 仿真/Optim。 |
-| `ads_get_sim_status` | 查询独立电路、GUI 电路或 Momentum 任务及归档结果。 |
-| `ads_add_goal` | 添加优化表达式、限值、范围和权重。 |
-| `ads_add_optim` | 放置 Optim 控制器。 |
-| `ads_release_optimizer` | 释放已完成 GUI Optim 的仿真器并关闭 Cockpit，不自动写回最佳值。 |
-
-### ADS 窗口管理 (3)
-
-| 工具 | 作用 |
-|---|---|
-| `ads_list_windows` | 列出进程内窗口 ID、设计标识和屏幕几何。 |
-| `ads_arrange_windows` | 用 setGeometry 拼铺、逐窗最大化或恢复工具保存的窗口状态。 |
-| `ads_set_mesh_visibility` | 加载/清除原生 MomentumMesh 显示对象，不保存设计。 |
-
-### 厂商库导入 (1)
-
-| 工具 | 作用 |
-|---|---|
-| `ads_import_library` | 注册本地厂商 lib.defs；重开工作区执行库初始化。 |
-
-### 原理图审计 (2)
-
-| 工具 | 作用 |
-|---|---|
-| `ads_audit_schematic` | 检测器件/文字/导线重叠与悬空端点。 |
-| `ads_autolabel` | 调整标注位置，不移动器件。 |
-
-### 结果与导出 (4)
-
-| 工具 | 作用 |
-|---|---|
-| `ads_get_results` | 读取 S 参数摘要和降采样幅相预览。 |
-| `ads_export_touchstone` | 按完整精度导出 N 端口矩阵为 .sNp。 |
-| `ads_plot_sparams` | 绘制指定 S 参数的 dB 幅度曲线。 |
-| `ads_compare_sparameters` | 在一致频率网格比较完整复数矩阵，不插值。 |
-
-## 原生 Layout 与电路联合仿真
-
-1. 搭建并保存金属源原理图。`ads_add_design_port` 在实例实际 net 上建立层次端子；仿真 Term/TermG 本身不等于 Subnetwork 端子。
-2. 原理图原生 artwork 转换使用 `ads_generate_layout`；坐标几何创建使用 `ads_create_layout`。前者调用 `update_design_from`，`parameterized=true` 可创建 PSN PCell。源器件必须具有相应 artwork，不会自动推断任意集总器件的封装/焊盘。
-3. 配置衬底、过孔、pin 和原生 Setup。`ads_generate_symbol` 独立使用 `SymbolGenerator` 生成 Dual/Quad 矩形符号，或生成原生 Layout lookalike；符号生成不会产生 EM 数据。
-4. `ads_configure_em_model` 配置原生模型自动创建/更新。重载工作区；先关闭 MCP 持有的工程，再在 ADS GUI 打开已保存副本并派发 Momentum。
-5. 使用 `ads_list_gui_sessions` 选择会话，检查 Setup，派发一次 Momentum，再轮询 `ads_get_sim_status`。当前支持微波模式下的一段线性 RF 扫频和可选的独立 DC 点。
-6. 检查模型文件，将电气器件接回对应 EM 安装端口；测试台网表应出现 `MomCmpt` 和正确的 `model.ndx`。使用 `ads_compare_sparameters` 在一致网格比较原始 EM 与模型结果。
-
-原生 emModel 自动生成走的是**保存 Setup 配置＋原生求解**路线，不是单独生成符号。修改网格后需要重载工作区并重新求解；工具不会自动清空旧模型缓存。网格显示工具加载/清除原生网格对象，不能替代几何样本对应性检查。
-
-```python
-# MCP 调用示意；替换占位符，并使用发现到的实际会话 ID。
-ads_run_simulation(
-    backend="gui", session_id=12345, workspace="<WORKSPACE>",
-    design="my_lib:cosim_tb:schematic", mode="simulate"
-)
-# 用返回的 task_id 轮询 ads_get_sim_status。
+```txt
+使用 ADS 单原理图工作流，处理指定的目标原理图。
+先读取已有条件，在独立副本中只修改我指定的参数或器件。
+复用同一专用会话，保留拓扑、板材、模型、端口、参考面和单位。
+未明确授权时不仿真。保存验收后，只返回变化、结果、耗时和记录路径。
 ```
 
-`backend="standalone"` 仍是默认值，可通过 `data_directory` 显式指定厂商 S2P 数据搜索目录；GUI 使用初始化后的工作区厂商库路径。GUI 操作通过官方桥接执行固定内部函数，要求选定会话打开匹配工程，不自动切换工作区。桥接超时不会自动重派。Momentum 和 GUI 电路任务可在服务重启后继续监控；进程内独立仿真线程不能跨重启恢复。
+入口为 `ads_design_workflow(action="run", task_directory=..., request_file=...)`：新建或导入一次，后续 `edit` 修改同一个独立工作区。完整短请求、请求 ID、显式 SP 和恢复规则见 [SINGLE-SCHEMATIC.zh-CN.md](SINGLE-SCHEMATIC.zh-CN.md)。
 
-详见 [原生联合仿真](docs/native-cosimulation.md)、[EM 建模](docs/em-modeling.md)和 [Momentum 执行与恢复](docs/momentum.md)。
+```powershell
+& '<REPO>/.venv/Scripts/python.exe' -B '<REPO>/design_workflow_client.py' --task-dir '<TASK_ROOT>' --ads-root '<ADS_INSTALL>' --interactive
+```
 
-## 示例工程与脚本
+开始或更新后运行 `ads_runtime_selfcheck`。旧进程可能仍加载旧代码，可在该客户端空闲时重新连接，或新建专用客户端；不自动重启其他会话。
 
-| 示例 | 内容与用途 |
+## 验证与文档
+
+本次分享副本通过 **201 项单元检查**，并用**独立合成原理图完成真实 ADS 2025 建图、修改和保存重开**。历史 SP/EM 验证与本次发布检查分开记录；上游公开示例保留出处，没有宣称全部在本分支重测。
+
+```powershell
+& '.venv/Scripts/python.exe' -B tools/run_unit_tests.py
+```
+
+| 内容 | 文档 |
 |---|---|
-| [联合仿真反射式移相器](examples/pin_phase_shifter_1p4ghz/README.md) | 原生金属源原理图、Layout、32 端口 emModel、PIN_diode/偏置两态测试台和基准曲线/指标；不再次优化该移相器。 |
-| [微带贴片天线 EM 优化](examples/microstrip_patch_em_optimization/README.md) | 参数化 matched_patch、全带宽验证用 emModel、原生 Optim 用 emModelOpt、最终尺寸 Layout 和参考结果。 |
-| [AVX 0402 3.9 pF 流程](examples/vendor_avx_0402/README.md) | 官方下载脚本、来源/哈希记录和型号选择指南，不附带原厂库。 |
+| 单张原理图入口 | [SINGLE-SCHEMATIC.zh-CN.md](SINGLE-SCHEMATIC.zh-CN.md) |
+| 提取、变更清单、落图及版本比较 | [DESIGN-WORKFLOW.zh-CN.md](DESIGN-WORKFLOW.zh-CN.md) |
+| 完整建图方案与验收 | [SCHEMATIC-WORKFLOW.zh-CN.md](SCHEMATIC-WORKFLOW.zh-CN.md) |
+| Load-pull 与基础扫描 | [RF-WORKFLOWS.zh-CN.md](RF-WORKFLOWS.zh-CN.md) |
+| 频变目标、搜索与容差 | [RF-ADVANCED.zh-CN.md](RF-ADVANCED.zh-CN.md) |
+| RF 队列与已有 HB 复核 | [RF-JOBS.zh-CN.md](RF-JOBS.zh-CN.md) |
+| 原生 EM 与专用 GUI | [EM-WORKFLOW.zh-CN.md](EM-WORKFLOW.zh-CN.md) |
+| 真实验证范围、耗时与限制 | [docs/VALIDATION.zh-CN.md](docs/VALIDATION.zh-CN.md) |
+| 隐私与运行数据 | [docs/PRIVACY.zh-CN.md](docs/PRIVACY.zh-CN.md) |
 
-移相器是对 “1.4 GHz Low-Cost PIN Diode Phase Shifter for L-Band Radiometer Antenna,” IEEE Access, 2019 的 **180°单比特电路的大致复现**（[IEEE 8752217](https://ieeexplore.ieee.org/document/8752217/)，DOI `10.1109/ACCESS.2019.2926140`），并非论文原始工程、完整四比特复现或实测样机。
+前一效率版本中，准备好输入后的“建图＋两次修改＋错误拦截”，复用会话中位数为 8.12 秒，基线为 9.52 秒（各 n=3）；调用 7→4 次，返回文本 5,525→2,158 UTF-8 字节。冷启动没有改善。**这不是完整射频设计耗时，也不是实际 token 节省比例。** 公开合成示例已更换电气参数，不把它冒充原性能测试输入。
 
-**集总器件的模型范围：**联合仿真反射式移相器使用原生非理想 `PIN_diode`，包含偏置相关响应、有限电阻、结电容和引线电感，并通过附加电阻修正反偏 RF 损耗，按论文等效阻抗校准。当前 L/C 仍采用理想电感/电容，470 Ω 电阻采用 ADS 集总电阻模型；尚未加入这些无源器件的厂商 Q/SRF、封装寄生和容差模型。金属走线、焊盘与过孔由 Momentum 建模。单独的 AVX vendor 模型示例尚未接入此移相器。参数与边界详见[移相器说明](examples/pin_phase_shifter_1p4ghz/README.md#集总器件模型)。
+## 隐私、贡献与致谢
 
-复制或解压示例后，先在**工程关闭时**重绑定发布包中的通用路径：
+发布内容不含维护者的原功放工程、模型库、许可证、凭据、聊天记录、虚拟环境或本机原始验证日志。新增原理图样例使用合成参数。以后运行生成的日志、CSV、自检和结果可能含自己的路径、模型名及工程数据，分享前仍须单独脱敏。
 
-```text
-.venv/Scripts/python.exe examples/rebind_workspace.py examples/pin_phase_shifter_1p4ghz/workspace
-```
+原始架构和 ADS 原生工作流来自 **Lavaxzyh 及上游贡献者**，本分支在其基础上补充 ADS 2025 兼容处理与上述工作流。保留 [MIT 许可证](LICENSE)，Keysight 软件及第三方模型遵守各自许可。
 
-然后在 ADS GUI 打开该工作区，检查或运行：
-
-```text
-.venv/Scripts/python.exe examples/run_example.py pin_phase_shifter_1p4ghz --action inspect
-.venv/Scripts/python.exe examples/run_example.py pin_phase_shifter_1p4ghz --action simulate
-```
-
-天线示例将名称替换为 `microstrip_patch_em_optimization`，仅天线支持 `--action optimize`。脚本读取最佳参数并在完成后调用 `ads_release_optimizer`，不会自动将最佳值写回原理图。如果 ADS 在关闭 Cockpit 时询问是否更新设计，除非明确需要应用最佳值，否则保留已保存的初始 VAR。选定最终尺寸后应再做完整频带复算。
-
-`Wm/Lm` 是 REAL/NO_UNIT 的 **Subnetwork 形式参数**，不是名为 subnet 的数值类型，通过 `Wm*1 mm`、`Lm*1 mm` 驱动 artwork。关闭几何插值后，缓存分辨率内的已有样本可复用；未缓存尺寸经 GUI 原生服务触发 Momentum。独立 hpeesofsim 进程不能替代该服务。详见 [参数化 EM 优化](docs/parameterized-em-optimization.md)。
-
-AVX 流程需动态查找 `C0402SE3r9.s2p`，注册 `lib.defs`、重开工程、顶层只放一次 `AVX_INCLUDE`，先做两端口 RF 验证，再接入 EM 安装端口。已测试数据从 50 MHz 开始，没有物理 DC 数据；DC 外推及电容隔直假设需要单独核对。详见 [厂商模型](docs/vendor-models.md)。
-
-其他可执行构建脚本：
-
-- `demo/build_native_line.py <NEW_WORKSPACE>`：通过 MCP 从最小原理图生成原生 Layout 和模型输出配置，再交接 GUI Momentum。
-- `demo/build_momentum.py --workspace <NEW_WORKSPACE> --run`：按 `demo/models/stepped_lpf.json` 创建平面低通几何并运行 Momentum。
-- `demo/run_momentum.py --workspace <WORKSPACE> --setup-file <SETUP_XML> --session-id <ID>`：求解已有 Setup；同一状态文件下可用 `--resume-task` 恢复查询。
-- `demo/step_by_step.py` 和 LC 综合脚本：保留的电路示例。执行前检查其输出目录；分步示例会删除并重建自己的示例目录。
-
-## 验证与限制
-
-单元/回归检查和协议测试：
-
-```text
-.venv/Scripts/python.exe -m pip install -r requirements-test.txt
-.venv/Scripts/python.exe -m unittest discover -s tests -p "*_unit.py"
-.venv/Scripts/python.exe tests/test_stdio.py
-```
-
-**106 项单元/回归检查通过**，覆盖输出/状态路径、Setup XML 保留、DC 计划、任务新鲜度、回调生命周期，以及经 scikit-rf 回读验证的完整 1/2/3/32 端口 Touchstone。stdio 测试注册了全部 49 个工具并构建小型原理图。协议/集成脚本需要 ADS，并生成自己的测试输出。
-
-ADS 原生验证结果：
-
-- 新建原理图生成的微带线完成 DC＋3 个 RF 点 Momentum，生成原生模型；两端口 MomCmpt 测试台同 RF 网格最大复数误差为 `1.77e-16`。
-- 天线 GUI 完整频带联合仿真完成；原生 Optim 复现 `FinalEF=0`、1 次迭代、7 次评估，`Wm=0.7327668436`、`Lm=20.5802420310`。另一个未缓存几何生成了新 `data.008` 样本。交互 Optim 没有独立完成日志时，以新最终数据集＋原生 Cockpit 停止状态判定完成。
-- 天线最终尺寸独立求解并取得实际网格。历史全带宽验证中，2.4 GHz S11 由 −26.357 dB 改善到 −48.315 dB；目标是单频匹配，不是增益/效率/带宽优化。
-- 移相器基准：1.4 GHz 相差 179.94°，两态插损 0.250/0.341 dB；采用理想 L/C、校准 PIN 假设和假定焊盘，本轮未重新 Optim。40→80 网格相差变化约 0.87°，不是严格收敛精度保证。
-- 官方 AVX 3.9 pF 型号、单个顶层 Include 和 21 点 RF 仿真通过，不宣称厂商模型具备完整 DC 行为。
-- ADS 窗口拼铺、最大化/恢复及原生网格对象加载已实测；显示、加密配置和求解完成是不同操作。
-
-任意 PDK 转换、任意集总封装生成、RFPro/FEM、通用多段扫频和跨多个服务进程调度不在当前范围内。示例不代表制造、容差或实测验证。
-
-## 可迁移性与发布内容
-
-示例保留 OA 几何及 `.sio/.sam/.ds/CSV` 数值数据。文本和嵌套求解日志 ZIP 中的本机路径、主机信息替换为通用路径/主机标记。复制后应运行重绑定脚本；该脚本不会修改 OA 二进制或清空样本缓存。运行状态和宣传物料位于发布仓库之外。
-
-公开仓库链接、论文引用和许可证署名予以保留。清理验收见 [审查记录](REVIEW.zh-CN.md)，版本变化见 [CHANGELOG](CHANGELOG.md)。
-
-## 仓库统计与贡献
-
-![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png)
-
-统计保留已记录的每日历史，并区分待补数据与零值；定义见 [访问统计](docs/traffic.md)。欢迎通过 GitHub Issue/PR 提交问题和改进。后续方向包括更多 PDK/版本支持与电路设计类型拓宽；v0.4.0 已包含指定 GUI 会话的原生操作。
-
-## 许可证与致谢
-
-[MIT](LICENSE)。Keysight 和 ADS 是 Keysight Technologies 的商标，ADS 与厂商数据适用各自许可。原理图审计/标注参考了 KiCad 的包围盒和候选位置思路，未包含 KiCad 源代码。KiCad 版权归其贡献者所有，采用 GPL-3.0。
+贡献优先针对作者的 `feature/power-amplifier` 分支提交 PR，暂不直接合入 main。维护方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。

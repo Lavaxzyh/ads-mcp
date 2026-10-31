@@ -1,0 +1,7 @@
+{
+  "tool": "ads_submit_rf_job",
+  "arguments": {
+    "workflow": "optimize",
+    "request_file": "<REPO>/examples/rf_jobs/optimization.json"
+  }
+}

@@ -1,4 +1,4 @@
-"""Native EM setup configuration and cache inspection (ADS 2027)."""
+"""Native EM setup configuration and cache inspection (ADS 2025/2027)."""
 from __future__ import annotations
 
 from typing import Literal
@@ -46,13 +46,62 @@ def em_operation(a):
     if not de.workspace_is_open():
         raise RuntimeError("No ADS workspace open")
     ws = Path(de.active_workspace().path).resolve()
-    lib = de.Library.get(a["lib"])
+    lib = (getattr(de.Library, "get", None) or de.get_open_library)(a["lib"])
     if not Path(lib.path).resolve().is_relative_to(ws):
         raise ValueError("EM operations require a local library")
     cell = lib.cell(a["cell"])
+    def view_folder(name):
+        view = cell.view(name)
+        folder = getattr(view, "path", None)
+        if folder is None:
+            folder = de._pde.get_path_to_cellview(a["lib"], a["cell"], name)
+        folder = Path(folder).resolve()
+        if not folder.is_relative_to(ws):
+            raise ValueError("EM view output escapes the workspace")
+        return folder
+
     op = a["operation"]
+    if op == 'model_storage':
+        edits=[]
+        full=a['retain_full_solver_data']
+        paths={'.//CoSimulation/cosimStoresOnlySParamData':str(not full),
+               './/CoSimulation/EmModelContent/reducedToDecreaseSize':str(int(not full)),
+               './/EMComponent/OutputEmModel/includeSParamDataOnly':str(not full),
+               './/EMComponent/OutputEmModel/EmModelContent/reducedToDecreaseSize':str(int(not full))}
+        for name in (a['setup'],a['model']):
+            path=view_folder(name)/'emStateFile.xml'
+            raw=path.read_bytes()
+            tree=ET.ElementTree(ET.fromstring(raw))
+            changed=False
+            for xpath,value in paths.items():
+                nodes=tree.findall(xpath)
+                if len(nodes)!=1:
+                    raise ValueError('Native EM storage field is not uniquely supported: '+xpath)
+                changed=changed or nodes[0].text!=value
+                nodes[0].text=value
+            edits.append((path,raw,tree,changed))
+        history=ws/'.ads-mcp'/'configuration_history'
+        history.mkdir(parents=True,exist_ok=True)
+        reports=[]
+        for path,raw,tree,changed in edits:
+            before=hashlib.sha256(raw).hexdigest()
+            identity=hashlib.sha256(str(path).encode()).hexdigest()[:12]
+            backup=history/(identity+'_'+before[:16]+'.xml')
+            if not backup.exists():backup.write_bytes(raw)
+            if changed:
+                if path.read_bytes()!=raw:
+                    raise RuntimeError('EM configuration changed externally before storage update: '+str(path))
+                temp=path.with_suffix('.xml.tmp')
+                ET.indent(tree)
+                tree.write(temp,encoding='utf-8',xml_declaration=True)
+                os.replace(temp,path)
+            reports.append({'file':str(path),'changed':changed,'backup':str(backup),
+                            'before_sha256':before,'after_sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
+        return {'retain_full_solver_data':full,'files':reports,
+                'requires_workspace_reload':any(e[3] for e in edits),'cache_deleted':False,
+                'scope':'Only newly generated native EM samples; existing samples are retained unchanged'}
     if op == "model_parameters":
-        options = Path(cell.view(a["model"]).path) / "emDataOptions.xml"
+        options = view_folder(a["model"]) / "emDataOptions.xml"
         tree = ET.parse(options)
         cp = tree.getroot().find("cellParameters")
         if cp is None:
@@ -78,7 +127,7 @@ def em_operation(a):
                 "geometry_interpolation": cp.get("useInterpolation"), "resolutions": a["resolutions"],
                 "cache_deleted": False}
     if op == "inspect_model":
-        folder = Path(cell.view(a["model"]).path)
+        folder = view_folder(a["model"])
         required = ["eesof_em_model.file", "model.ndx", "emDataIndex.xml", "emStateFile.xml"]
         present = {n: (folder / n).is_file() for n in required}
         samples, names = [], []
@@ -103,7 +152,7 @@ def em_operation(a):
                 "geometry_interpolation": interpolation,
                 "data_files": [p.name for p in folder.glob("data.*")],
                 "note": "File presence is not a numerical validation or proof of current mesh correspondence"}
-    folder = Path(cell.view(a["setup"]).path)
+    folder = view_folder(a["setup"])
     xml = folder / "emStateFile.xml"
     tree = ET.parse(xml)
     main = tree.getroot().find("MainWindow")

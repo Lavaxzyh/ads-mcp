@@ -2,13 +2,13 @@
 
 All `keysight.ads.de` access lives here behind one lock (the DE engine is not
 thread-safe).  The de package is imported lazily AFTER the environment
-(HPEESOF_DIR et al.) is prepared; the native engine is cp314-only, so this
-module must run on the ADS-bundled Python.
+(HPEESOF_DIR et al.) is prepared; native modules are version-specific, so this
+module must run on the matching ADS-bundled Python (ADS 2025: Python 3.12).
 
-Verified against ADS 2027 (v6.5.0):
+Originally verified upstream on ADS 2027; this branch validates ADS 2025:
 - microstrip family (MLIN/MSUB/MTEE/...) lives in library `ads_tlines`
 - S-parameter controller / Term live in `ads_simulation`
-- VAR / MeasEqn live in `ads_datacmps`; GROUND lives in `ads_rflib`
+- VAR lives in `ads_datacmps`, MeasEqn in `ads_simulation`; GROUND in `ads_rflib`
 - the substrate instance must be named `MSub1` and its `Subst` references are
   left at default (string params lose their netlist quoting if assigned)
 - hpeesofsim output dataset appears as `<cell>.ds` in the output directory
@@ -26,7 +26,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-DEFAULT_HPEESOF_DIR = str(Path(os.environ.get("ProgramFiles") or "C:/Program Files") / "Keysight" / "ADS2027")
+DEFAULT_HPEESOF_DIR = str(Path(os.environ.get("ProgramFiles") or "C:/Program Files") / "Keysight" / "ADS2025")
 
 #Cells whose parameter names we know; browse_components() merges this with
 #on-disk enumeration so the agent always sees authoritative parameter lists
@@ -42,7 +42,8 @@ KNOWN_COMPONENTS: dict[str, dict[str, Any]] = {
     "ads_simulation:Term": {"desc": "port terminator", "params": ["Num", "Z"]},
     "ads_simulation:S_Param": {"desc": "S-parameter controller", "params": ["Start", "Stop", "Step"]},
     "ads_datacmps:VAR": {"desc": "variable block (set vars via add_var)", "params": []},
-    "ads_datacmps:MeasEqn": {"desc": "measurement equation", "params": ["Eqn"]},
+    "ads_simulation:MeasEqn": {"desc": "measurement equations (repeated Meas parameter)", "params": ["Meas"]},
+    "ads_simulation:Optim": {"desc": "optimizer (select OptimType by form_name)", "params": ["OptimType", "MaxIters", "FinalAnalysis"]},
     "ads_rflib:GROUND": {"desc": "ground", "params": []},
     "ads_rflib:R": {"desc": "resistor", "params": ["R"]},
     "ads_rflib:L": {"desc": "inductor", "params": ["L"]},
@@ -93,6 +94,7 @@ class AdsEngine:
         self._lock = threading.RLock()
         self._design = None  # current open db_uu design (schematic)
         self.workspace_path: str | None = None
+        self._supports_ads_annot: bool | None = None
 
     @contextlib.contextmanager
     def _op(self):
@@ -219,12 +221,20 @@ class AdsEngine:
             design = self._current_design()
             if cell in _MICROSTRIP_CELLS and not instance_name:
                 instance_name = _SUBSTRATE_DEFAULT_NAME
+            # Local ADS 2025 compatibility: ads_annot was added in a later API.
+            import inspect
+            if self._supports_ads_annot is None:
+                self._supports_ads_annot = "ads_annot" in inspect.signature(design.add_instance).parameters
+            has_ads_annot = self._supports_ads_annot
+            if not has_ads_annot and not show_annotations:
+                raise NotImplementedError("This ADS version does not support show_annotations=False")
+            annotation_options = {"ads_annot": show_annotations} if has_ads_annot else {}
             inst = design.add_instance(
                 de.LCVName(lib, cell, "symbol"),
                 (float(x), float(y)),
                 name=instance_name,
                 angle=float(angle),
-                ads_annot=show_annotations,
+                **annotation_options,
             )
             applied: dict[str, str] = {}
             rejected: dict[str, str] = {}
@@ -240,6 +250,8 @@ class AdsEngine:
                     applied[pname] = str(value)
                 except Exception as exc:  # noqa: BLE001
                     rejected[pname] = str(exc)
+            if not has_ads_annot and show_annotations:
+                inst.update_item_annotation()
             return {
                 "instance": inst.name,
                 "cell": f"{lib}:{cell}",
@@ -329,19 +341,26 @@ class AdsEngine:
 
     def add_optim(self, optim_type: str = "gradient", max_iters: int = 60) -> dict[str, Any]:
         """Place the optimization controller (auto-collects all opt-vars and goals)."""
+        # An ADS enumerated parameter takes its UI form, not a literal string.
+        # Keep the existing public argument, but reject typos before placement.
+        if isinstance(max_iters, bool) or not 1 <= max_iters <= 100000:
+            raise ValueError("Use positive bounded max_iters")
         with self._op():
             de = get_de()
             design = self._current_design()
-            if design.find_instance("OPT1") is None:
-                design.add_instance(
-                    de.LCVName("ads_simulation", "Optim", "symbol"),
-                    (2.5, -4.5),
-                    name="OPT1",
-                    angle=0.0,
-                )
-            opt = design.find_instance("OPT1")
-            opt.parameters["OptimType"].value = str(optim_type)
-            opt.parameters["MaxIters"].value = str(max_iters)
+            with de.db.Transaction(design, "Configure optimizer") as tx:
+                if design.find_instance("OPT1") is None:
+                    design.add_instance(de.LCVName("ads_simulation", "Optim", "symbol"),
+                                        (2.5, -4.5), name="OPT1", angle=0.0)
+                opt = design.find_instance("OPT1")
+                forms = {f.name.casefold(): f.name for f in opt.model_def.parameters["OptimType"].formset.forms}
+                form = forms.get(optim_type.casefold())
+                if form is None:
+                    raise ValueError("Unknown optimizer method; available forms: " + ", ".join(forms.values()))
+                opt.parameters["OptimType"].form_name = form
+                opt.parameters["MaxIters"].value = str(max_iters)
+                opt.update_item_annotation()
+                tx.commit()
             return {"optim": "OPT1", "type": str(optim_type), "max_iters": max_iters}
 
     def audit_schematic(self, lib: str | None = None, cell: str | None = None) -> dict[str, Any]:
@@ -467,6 +486,9 @@ class AdsEngine:
         body-body 碰撞不在此处理(属于布局间距问题),只报告。
         """
         with self._op():
+            import math
+            if not 1 <= max_pass <= 1000 or not math.isfinite(step) or step <= 0:
+                raise ValueError("Use 1..1000 passes and a finite positive step")
             de = get_de()
             design = self._current_design()
             EPS = 1e-9
@@ -520,13 +542,16 @@ class AdsEngine:
                                            if "body-body" in c["kinds"])})
                 if not text_collisions:
                     break
-                # fix the first text collision: move b's annotation away from a
+                # Move the text that actually collides. In a text-body collision
+                # moving B's annotation cannot remove A's overlap with B's body.
                 c0 = text_collisions[0]
-                inst = design.find_instance(c0["b"])
+                moving, obstacle = ((c0["a"], c0["b"]) if "text-body" in c0["kinds"]
+                                    else (c0["b"], c0["a"]))
+                inst = design.find_instance(moving)
                 if inst is None:
                     break
-                A = by_name[c0["a"]]
-                B = by_name[c0["b"]]
+                A = by_name[obstacle]
+                B = by_name[moving]
                 others = [i for i in items if i["name"] not in (c0["a"], c0["b"])]
                 acx = (A["body"][0] + A["body"][2]) / 2
                 acy = (A["body"][1] + A["body"][3]) / 2
@@ -549,12 +574,16 @@ class AdsEngine:
                             break
                 if chosen is None:
                     chosen = (sx * step, sy * step)  # fallback: move farther away
-                try:
-                    inst.move_annotation(chosen)
-                    moved.append({"inst": c0["b"], "offset": list(chosen),
-                                  "vs": c0["a"]})
-                except Exception:
-                    break
+                with de.db.Transaction(design, "Move instance annotation") as txn:
+                    if hasattr(inst, "move_annotation"):
+                        inst.move_annotation(chosen)
+                    else:
+                        # Documented ADS 2025 AEL equivalent; no GUI selection.
+                        de.ael.db_move_instance_annotation(inst, chosen[0], chosen[1])
+                    txn.commit()
+                moved.append({"inst": moving, "offset": list(chosen), "vs": obstacle})
+            if moved:
+                design.save_design()
             final = self.audit_schematic()
             return {"moved": moved, "passes": passes,
                     "remaining_collisions": final["collisions"],

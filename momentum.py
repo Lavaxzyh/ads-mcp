@@ -1,7 +1,7 @@
 """Run saved native Momentum setups through an existing ADS GUI session.
 
-Only the optional GUI bridge starts Keysight's installed ads-mcp.exe. This
-module contains no vendor templates and never edits a setup or closes ADS.
+The GUI bridge uses Keysight's helper or the owned ADS 2025 transport. Before
+dispatch, a native Save normalizes the local EM Setup with an audited backup.
 """
 from __future__ import annotations
 
@@ -147,7 +147,8 @@ class OfficialAdsClient:
 
     def __enter__(self):
         if not self.executable.is_file():
-            raise FileNotFoundError(f"Keysight GUI bridge not found: {self.executable}")
+            from gui_bridge_2025 import ManagedAdsClient
+            return ManagedAdsClient(timeout=self.timeout)
         self.process = subprocess.Popen([str(self.executable)], stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                         text=True, encoding="utf-8", errors="replace", bufsize=1,
@@ -247,10 +248,15 @@ class OfficialAdsClient:
         raise RuntimeError("ADS GUI did not return the expected Momentum response")
 
 
-def _remote_code(info: dict, launch: bool) -> str:
+def _remote_code(info: dict, launch: bool, prepare: bool = False) -> str:
+    import inspect
+    from native_geometry import layout_geometry_snapshot
+    from native_em_setup import save_native_em_setup
     # JSON is data, never executable input. Names and paths are checked again
     # inside ADS to avoid acting on another workspace after a user switches it.
-    data = repr(json.dumps({k: info[k] for k in ("workspace", "library_dir", "lib", "cell", "view", "setup")}))
+    payload={k: info[k] for k in ("workspace", "library_dir", "lib", "cell", "view", "setup")}
+    payload['expected_geometry_sha256']=info.get('expected_geometry_sha256')
+    data = repr(json.dumps(payload))
     return f'''import json
 from pathlib import Path
 import keysight.ads.de as de
@@ -266,7 +272,13 @@ linked = de.ael.deem_find_em_setup_view_name_for_context(ctx)
 if linked != args["setup"]:
     raise RuntimeError("Layout is not linked to the inspected native EM Setup")
 result = {{"validated": True, "setup": linked}}
+{inspect.getsource(save_native_em_setup) if prepare else ''}
+{'result["native_setup_save"] = save_native_em_setup(args)' if prepare else ''}
+{inspect.getsource(layout_geometry_snapshot)}
+result["geometry"] = layout_geometry_snapshot(args)
 if {launch!r}:
+    if args['expected_geometry_sha256'] and result['geometry']['sha256'] != args['expected_geometry_sha256']:
+        raise RuntimeError('Native geometry changed between validation and dispatch; no solver was started')
     result["accepted"] = bool(de.ael.deem_run_em_setup(ctx, linked))
 print({_MARKER!r} + json.dumps(result))
 '''
@@ -287,6 +299,11 @@ class MomentumRunner:
         return {"sessions": payload.get("sessions", [])}
 
     def start(self, state, session_id: int, workspace: str, setup_file: str, setup: str = "emSetup") -> dict:
+        from workspace_activity import edit_guard
+        with edit_guard(workspace):
+            return self._start(state,session_id,workspace,setup_file,setup)
+
+    def _start(self, state, session_id: int, workspace: str, setup_file: str, setup: str = "emSetup") -> dict:
         if type(session_id) is not int or session_id <= 0:
             raise ValueError("session_id must be a positive ADS GUI session id")
         with self._start_lock:
@@ -303,13 +320,22 @@ class MomentumRunner:
                 connected = client.call("connect_session", {"session_id": session_id})
                 if not connected.get("connected") or connected.get("mode") != "remote":
                     raise RuntimeError("could not attach to the requested ADS GUI session")
-                client.execute(_remote_code(info, launch=False))
+                preflight = client.execute(_remote_code(info, launch=False, prepare=True))
+                # Native ADS may expand old template defaults and normalize
+                # numbers on save. Fingerprint only after this explicit save.
+                info = inspect_setup(workspace, setup_file, setup)
+                info['expected_geometry_sha256']=(preflight.get('geometry') or {}).get('sha256')
                 monitor = {**info, "token": uuid.uuid4().hex, "session_id": session_id,
+                           "geometry_before": preflight.get("geometry"),
+                           "native_setup_save": preflight.get("native_setup_save"),
+                           "setup_sha256": hashlib.sha256(Path(info['setup_file']).read_bytes()).hexdigest(),
                            "started_at_epoch": time.time(), "baseline_log": _signature(Path(info["log"])),
                            "baseline_datasets": {str(p.resolve()): _signature(p)
                                                  for p in (Path(info["workspace"]) / "data").glob("*.ds")}}
                 task_id = state.create_external_task("momentum", monitor)
                 try:
+                    from workspace_activity import reserve
+                    reserve(workspace,task_id,monitor['token'],state.path,session_id)
                     with lock.open("x", encoding="utf-8") as fh:
                         json.dump({"task_id": task_id, "token": monitor["token"]}, fh)
                 except Exception as exc:
@@ -337,6 +363,8 @@ class MomentumRunner:
                 path.unlink()
         except FileNotFoundError:
             pass
+        from workspace_activity import release
+        release(monitor['workspace'],monitor['token'])
 
     @staticmethod
     def _snapshot(monitor: dict, task_id: str, dataset: Path, log: Path) -> dict:
@@ -352,8 +380,19 @@ class MomentumRunner:
             os.replace(temporary, destination)
         if _signature(dataset) != source_signature:
             raise RuntimeError("Momentum dataset changed while capturing task results; inspect the ADS run")
-        return {"dataset": str(target / dataset.name), "log": str(target / log.name),
+        result={"dataset": str(target / dataset.name), "log": str(target / log.name),
                 "source_dataset": str(dataset), "source_log": str(log)}
+        mesh=Path(monitor['simulation_dir'])/'proj.msh'
+        if monitor.get('geometry_before') and mesh.is_file():
+            shutil.copy2(mesh,target/'proj.msh')
+            proof={'task_id':task_id,'geometry':monitor['geometry_before'],
+                   'mesh_file':str(mesh),'mesh_sha256':hashlib.sha256(mesh.read_bytes()).hexdigest(),
+                   'setup_file':monitor['setup_file'],'setup_sha256':monitor['setup_sha256']}
+            proof_file=target/'mesh-proof.json'
+            proof_file.write_text(json.dumps(proof,indent=2),encoding='utf-8')
+            (Path(monitor['simulation_dir'])/'ads-mcp-mesh-proof.json').write_text(json.dumps(proof,indent=2),encoding='utf-8')
+            result.update(mesh_proof=str(proof_file),geometry_sha256=monitor['geometry_before']['sha256'])
+        return result
 
     def poll(self, state, task_id: str, validate_dataset) -> dict:
         with self._poll_lock:
@@ -417,6 +456,14 @@ class MomentumRunner:
                         if not re.search(r"Simulation Mode:\s*(?:uW|MW|Microwave)\b", header, re.I):
                             raise ValueError("fresh log does not identify Momentum microwave mode")
                         grid = validate_dataset(str(dataset), monitor["frequency"])
+                        if monitor.get('geometry_before'):
+                            if hashlib.sha256(Path(monitor['setup_file']).read_bytes()).hexdigest()!=monitor['setup_sha256']:
+                                raise ValueError('EM Setup changed during the solve; current settings cannot be attributed to these results')
+                            with self.client_factory(self.executable) as client:
+                                client.call('connect_session',{'session_id':monitor['session_id']})
+                                current=client.execute(_remote_code(monitor,launch=False))
+                            if current['geometry']['sha256']!=monitor['geometry_before']['sha256']:
+                                raise ValueError('Native geometry changed during the solve; current layout/mesh correspondence is unproven')
                         captured = self._snapshot(monitor, task_id, dataset, log)
                     except Exception as exc:
                         state.update_external_task(task_id, status="error", error=str(exc), progress=progress)

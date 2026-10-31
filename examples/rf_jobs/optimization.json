@@ -1,0 +1,98 @@
+{
+  "netlist_path": "<REPO>/examples/rf_jobs/test_wrk/pa_output_sp.net",
+  "parameters": [
+    {
+      "variable": "Lmatch",
+      "instance": "",
+      "model": "",
+      "parameter": "",
+      "scope": "",
+      "unit": "nH",
+      "minimum": 2.3,
+      "maximum": 3.4,
+      "step": 0.05,
+      "allowed_values": [],
+      "e_series": null
+    },
+    {
+      "variable": "Cmatch",
+      "instance": "",
+      "model": "",
+      "parameter": "",
+      "scope": "",
+      "unit": "pF",
+      "minimum": 2.3,
+      "maximum": 3.4,
+      "step": 0.05,
+      "allowed_values": [],
+      "e_series": null
+    }
+  ],
+  "evaluation": {
+    "start_hz": 900000000.0,
+    "stop_hz": 970000000.0,
+    "reference_ohms": 50.0,
+    "load_r_ohm": 50.0,
+    "load_x_ohm": 0.0,
+    "target_r_ohm": 10.0,
+    "target_x_ohm": 0.0,
+    "target_table": [],
+    "target_interpolation": "exact",
+    "region_file": "",
+    "input_port": 1,
+    "reference_plane": "vendor FET external drain N7 to 50-ohm output N6; output matching only",
+    "max_error_ohm": 20.0,
+    "source_r_ohm": 10.0,
+    "source_x_ohm": 0.0,
+    "criteria": [
+      {
+        "name": "loaded_gain",
+        "metric": "transducer_gain_db",
+        "aggregate": "min",
+        "start_hz": null,
+        "stop_hz": null,
+        "lower": -4.0,
+        "upper": null,
+        "objective": "maximize",
+        "target": null,
+        "scale": 1.0,
+        "weight": 1
+      },
+      {
+        "name": "ripple",
+        "metric": "transducer_gain_db",
+        "aggregate": "ripple",
+        "start_hz": null,
+        "stop_hz": null,
+        "lower": null,
+        "upper": 1.0,
+        "objective": "minimize",
+        "target": null,
+        "scale": 0.5,
+        "weight": 1
+      }
+    ]
+  },
+  "settings": {
+    "evaluation_budget": 8,
+    "simulation_budget": 8,
+    "seed": 0,
+    "initial_fraction": 0.4,
+    "refine_rounds": 2,
+    "refine_top": 3,
+    "stop_when_feasible": false,
+    "wall_seconds": 1800,
+    "geometry_constraints": [
+      {
+        "name": "L stock limit",
+        "coefficients": {
+          "top/Lmatch": 1.0
+        },
+        "lower": null,
+        "upper": 3.1,
+        "unit": "nH"
+      }
+    ]
+  },
+  "use_cache": false
+}
