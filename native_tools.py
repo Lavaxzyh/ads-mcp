@@ -1,7 +1,8 @@
 """Register the v0.4 native workflow tools without an arbitrary-code endpoint."""
 from typing import Literal
 from pathlib import Path
-from ads_gui import call_native
+from contextlib import nullcontext
+from ads_gui import active_workspace, call_native
 from design_operations import CellParameter, design_operation
 from em_model import MeshSettings, FrequencyPlan, PortSettings, em_operation
 from gui_windows import window_operation
@@ -12,23 +13,22 @@ def register(mcp, engine, state):
     def invoke(fn, data, session_id=None, workspace="", readonly=False):
         if not readonly and any(t["status"] == "running" for t in state.snapshot()["tasks"].values()):
             raise RuntimeError("Wait for the active simulation before editing this session")
-        ws = workspace or engine.workspace_path or ""
-        if session_id is None:
-            with engine._op():
-                result = call_native(fn, data, workspace=ws)
-        else:
-            if engine.workspace_path is not None:
-                raise RuntimeError("Close the MCP-owned workspace before using the GUI path")
+        if session_id is not None and engine.workspace_path is not None:
+            raise RuntimeError("Close the MCP-owned workspace before using the GUI path")
+        # Resolve headless state while holding its engine lock. A missing GUI
+        # workspace is read through the selected transport, including the
+        # official ADS 2027 bridge as well as the managed ADS 2025 bridge.
+        with engine._op() if session_id is None else nullcontext():
+            ws = workspace or engine.workspace_path or ""
             if readonly:
                 result = call_native(fn, data, session_id, ws)
             else:
                 from workspace_activity import edit_guard
                 if not ws:
-                    from gui_bridge_2025 import discover
-                    matches=[s for s in discover() if s['session_id']==session_id]
-                    if len(matches)!=1:raise RuntimeError('Select an identified owned session and workspace')
-                    ws=matches[0]['workspace']
+                    ws = call_native(active_workspace, {}, session_id)["workspace"]
                 with edit_guard(ws):
+                    # call_native rechecks the actual workspace before editing;
+                    # a switch after discovery must not target an unlocked one.
                     result = call_native(fn, data, session_id, ws)
         return {"ok": True, **result}
 

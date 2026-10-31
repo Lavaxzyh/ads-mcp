@@ -6,6 +6,15 @@ import json
 from pathlib import Path
 
 
+def active_workspace(arguments):
+    """Read the actual workspace in the selected local or GUI DE process."""
+    from pathlib import Path
+    from keysight.ads import de
+    if not de.workspace_is_open():
+        raise RuntimeError("Open a workspace in the selected ADS process before editing")
+    return {"workspace": str(Path(de.active_workspace().path).resolve())}
+
+
 def call_native(operation, arguments: dict, session_id: int | None = None,
                 workspace: str = "", timeout: float = 55):
     """Execute our own operation on the ADS main thread, locally or via bridge.
