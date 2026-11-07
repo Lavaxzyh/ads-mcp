@@ -16,7 +16,7 @@
 
 - **已验证环境：Windows、ADS 2027 v6.5.0、ADS 自带 Python 3.14**，需有效的 ADS/Momentum 许可证；其他版本和平台尚未验证。
 - 使用 ADS 解释器创建虚拟环境并复用其 Python 包，以匹配 cp314 原生模块。Keysight 包由本机 ADS 安装提供。
-- MCP 客户端需支持 stdio，如 Claude Desktop、ZCode 或 Cursor。
+- MCP 客户端须支持通过 `stdio` 连接本地 MCP 服务器，例如 OpenAI Codex、Claude Desktop、DeepSeek Harness、ZCode 等。
 - Momentum、GUI 联合仿真和 Optim 依赖本机官方 `bin/ads-mcp.exe` 桥接及打开目标工程的 ADS GUI 会话；EM 求解还需已保存的原生 EM Setup。
 
 | Python 包 | 来源与用途 |

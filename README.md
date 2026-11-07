@@ -16,7 +16,7 @@ English · [简体中文](README.zh-CN.md)
 
 - **Validated environment: Windows, ADS 2027 v6.5.0, and ADS-bundled Python 3.14**, with valid ADS/Momentum licenses. Other versions and platforms have not been validated.
 - Create a virtual environment with the ADS interpreter and reuse its packages to match the native cp314 modules. Keysight packages come from the local ADS installation.
-- The MCP client must support stdio, such as Claude Desktop, ZCode, or Cursor.
+- The MCP client must support local MCP servers over `stdio`. Examples include OpenAI Codex, Claude Desktop, DeepSeek Harness, and ZCode, among others.
 - Momentum, GUI cosimulation, and Optim require the installed official `bin/ads-mcp.exe` bridge and an ADS GUI session with the target workspace open. EM solving also requires a saved native EM Setup.
 
 | Python package | Source and purpose |
