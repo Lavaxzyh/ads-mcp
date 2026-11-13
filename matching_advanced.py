@@ -51,6 +51,8 @@ class SearchSettings(StrictModel):
 
 class ToleranceParameter(ParameterTarget):
     nominal: FiniteFloat
+    correlation_group: str = Field(default="",max_length=80)
+    correlation_sign: Literal[-1,1] = 1
     relative_pct: FiniteFloat | None = Field(default=None, gt=0)
     absolute: FiniteFloat | None = Field(default=None, gt=0)
     minimum: FiniteFloat | None = None
@@ -61,6 +63,8 @@ class ToleranceParameter(ParameterTarget):
 
     @model_validator(mode="after")
     def interval(self):
+        if self.correlation_sign == -1 and not self.correlation_group:
+            raise ValueError("A negative loading requires a named correlation_group")
         if (self.relative_pct is None) == (self.absolute is None):
             raise ValueError("Specify exactly one relative_pct or absolute tolerance")
         d = self.delta()
@@ -149,7 +153,8 @@ def prepare_advanced(kind, netlist_path, parameters, evaluation, settings=None, 
             axis(p, config.coarse_points)
         count = config.budget
     else:
-        count = 1 + 2*len(targets) + (2**len(targets) if config.method == "corners" else config.samples if config.method == "monte_carlo" else 0)
+        factors = len(tolerance_factors(targets))
+        count = 1 + 2*factors + (2**factors if config.method == "corners" else config.samples if config.method == "monte_carlo" else 0)
         if count > config.budget:
             raise ValueError(f"Tolerance experiment needs {count} evaluations, exceeding budget={config.budget}; reduce samples or use Monte Carlo")
     output = output_dir or str(fresh_output("", "matching_" + kind, [netlist_path]))
@@ -217,28 +222,40 @@ def run_search(plan, progress=lambda p: None):
                          method="Bounded coarse grid/stratified subset, then local fine grids around best coarse cases")
 
 
+def tolerance_factors(targets):
+    groups = {}
+    for index, p in enumerate(targets):
+        key = ("group", p.correlation_group) if p.correlation_group else ("parameter",p.key())
+        groups.setdefault(key,[]).append(index)
+    return list(groups.values())
+
+
 def tolerance_design(targets, settings):
     nominal = np.asarray([p.nominal for p in targets], float)
-    delta = np.asarray([p.delta() for p in targets], float)
+    groups = tolerance_factors(targets)
+    delta = np.zeros((len(groups),len(targets)))
+    for i, group in enumerate(groups):
+        for j in group:
+            delta[i,j] = targets[j].delta()*targets[j].correlation_sign
     design = [("nominal", nominal.tolist())]
-    for i in range(len(targets)):
+    for i in range(len(groups)):
         for sign, label in ((-1, "minus"), (1, "plus")):
-            v = nominal.copy(); v[i] += sign*delta[i]
+            v = nominal + sign*delta[i]
             design.append((f"oat_{i}_{label}", v.tolist()))
     if settings.method == "corners":
-        for signs in itertools.product((-1, 1), repeat=len(targets)):
-            design.append(("trial", (nominal + np.asarray(signs)*delta).tolist()))
+        for signs in itertools.product((-1, 1), repeat=len(groups)):
+            design.append(("trial", (nominal + np.asarray(signs)@delta).tolist()))
     elif settings.method == "monte_carlo":
         rng = np.random.default_rng(settings.seed)
         if settings.distribution == "uniform":
-            draws = rng.uniform(-1, 1, size=(settings.samples, len(targets)))
+            draws = rng.uniform(-1, 1, size=(settings.samples, len(groups)))
         else:
-            draws = rng.normal(0, 1/3, size=(settings.samples, len(targets)))
+            draws = rng.normal(0, 1/3, size=(settings.samples, len(groups)))
             invalid = np.abs(draws) > 1
             while invalid.any():
                 draws[invalid] = rng.normal(0, 1/3, size=int(invalid.sum()))
                 invalid = np.abs(draws) > 1
-        design.extend(("trial", (nominal + d*delta).tolist()) for d in draws)
+        design.extend(("trial", (nominal + d@delta).tolist()) for d in draws)
     return design
 
 
@@ -256,6 +273,8 @@ def run_tolerance(plan, progress=lambda p: None):
             break
     good = {r["phase"]: r for r in runner.rows if r["status"] == "done" and r["phase"] != "trial"}
     sensitivity = []
+    risk = []
+    groups = tolerance_factors(targets)
     if "nominal" in good:
         nominal_points = pd.read_csv(good["nominal"]["points_csv"])
         mask = nominal_points.is_scored.to_numpy(bool)
@@ -263,17 +282,31 @@ def run_tolerance(plan, progress=lambda p: None):
             points = pd.read_csv(row["points_csv"])
             return (points.zin_r_ohm.to_numpy() + 1j*points.zin_x_ohm.to_numpy())[mask]
         base = impedance(good["nominal"])
-        for i, p in enumerate(targets):
+        for i, group in enumerate(groups):
+            p = targets[group[0]]
+            factor = p.correlation_group or p.key()
+            step = 1.0 if p.correlation_group else p.delta()
             minus, plus = good.get(f"oat_{i}_minus"), good.get(f"oat_{i}_plus")
             if minus is None or plus is None:
                 continue
             low, high = impedance(minus), impedance(plus)
             impact = float(max(abs(high-base).max(), abs(low-base).max()))
-            sensitivity.append(dict(parameter=p.key(), unit=p.unit, nominal=p.nominal, tolerance=p.delta(),
-                                    max_delta_z_ohm=impact, max_abs_dz_dparameter=float(abs((high-low)/(2*p.delta())).max()),
-                                    score_derivative=(plus["max_error_ohm"]-minus["max_error_ohm"])/(2*p.delta()),
+            sensitivity.append(dict(parameter=factor, unit="normalized factor" if p.correlation_group else p.unit,
+                                    nominal=0 if p.correlation_group else p.nominal, tolerance=step,
+                                    members=[targets[j].key() for j in group],
+                                    max_delta_z_ohm=impact, max_abs_dz_dparameter=float(abs((high-low)/(2*step)).max()),
+                                    score_derivative=(plus["max_error_ohm"]-minus["max_error_ohm"])/(2*step),
                                     minus_error_ohm=minus["max_error_ohm"], plus_error_ohm=plus["max_error_ohm"],
                                     nominal_error_ohm=good["nominal"]["max_error_ohm"]))
+            for row in (minus,plus):
+                if not row.get("feasible",True):
+                    data = pd.read_csv(row["points_csv"])
+                    measured = data[data.is_scored]
+                    worst = measured.loc[measured.error_ohm.idxmax()]
+                    risk.append(dict(factor=factor, parameters=row["parameters"], phase=row["phase"],
+                                     normalized_violation=row["constraint_violation"], worst_impedance_freq_hz=worst.freq_hz,
+                                     criteria=[c for c in row.get("criteria",[]) if not c["passes"]]))
+    risk.sort(key=lambda row:-row["normalized_violation"])
     sensitivity.sort(key=lambda r: (-r["max_delta_z_ohm"], r["parameter"]))
     for rank, row in enumerate(sensitivity, 1):
         row["rank"] = rank
@@ -295,11 +328,11 @@ def run_tolerance(plan, progress=lambda p: None):
                  worst_error_ohm=float(errors.max()) if len(errors) else None,
                  quantile_population="Successful trial simulations only; inspect failures separately",
                  distribution=(settings.distribution if settings.method == "monte_carlo" else None),
-                 distribution_definition="Independent parameters; uniform within ±tolerance, or Gaussian sigma=tolerance/3 conditioned on ±tolerance. OAT and corners are deterministic, not statistical yield.",
+                 distribution_definition="Independent factors. Each named group shares a signed normalized draw; ungrouped parameters vary independently. OAT/corners are deterministic.",
                  seed=settings.seed, manufacturing_yield_verified=False)
     write_json(runner.out / "tolerance_statistics.json", stats)
-    return runner.finish(incomplete=len(runner.rows) != len(design) or len(sensitivity) != len(targets),
+    return runner.finish(incomplete=len(runner.rows) != len(design) or len(sensitivity) != len(groups),
                          requested_cases=len(design), skipped_cases=len(design)-len(runner.rows),
-                         nominal_case=good.get("nominal"), sensitivity=sensitivity, trial_statistics=stats,
+                         nominal_case=good.get("nominal"), sensitivity=sensitivity, trial_statistics=stats, factor_limit_violations=risk,
                          sensitivity_csv=str(runner.out / "sensitivity.csv"),
                          sensitivity_definition="Rank by largest |Zperturbed-Znominal| at scored frequencies under each specified tolerance; local OAT, not a global sensitivity index")

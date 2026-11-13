@@ -229,20 +229,21 @@ def run_hb_case(case, request):
 def compression_summary(rows):
     groups={}
     for row in rows:
-        if row["status"]=="done":
-            p=row["conditions"]
-            groups.setdefault((row["candidate_id"],p["freq_hz"],tuple(p["bias_values"])),[]).append(row)
+        p=row["conditions"]
+        groups.setdefault((row["candidate_id"],p["freq_hz"],tuple(p["bias_values"])),[]).append(row)
     records=[]
     for (candidate,freq,bias),group in groups.items():
         ordered=sorted(group,key=lambda r:r["conditions"]["pavs_dbm"])
         record=dict(candidate_id=candidate,freq_hz=freq,bias_values=list(bias),p1db_input_dbm=None,
                     interpretation="Relative to the lowest two sampled-drive gains, only if these agree within 0.2 dB; no extrapolation")
-        if len(ordered)<3 or abs(ordered[0]["gain_db"]-ordered[1]["gain_db"])>0.2:
+        if len(ordered)<3 or any(r["status"]!="done" for r in ordered[:2]) or abs(ordered[0]["gain_db"]-ordered[1]["gain_db"])>0.2:
             record["status"]="small_signal_baseline_not_established"
         else:
             reference=(ordered[0]["gain_db"]+ordered[1]["gain_db"])/2
             record.update(status="not_bracketed",reference_gain_db=reference)
             for a,b in zip(ordered,ordered[1:]):
+                if a["status"]!="done" or b["status"]!="done":
+                    continue
                 ga,gb=reference-a["gain_db"],reference-b["gain_db"]
                 if ga<1<=gb:
                     pa,pb=a["conditions"]["pavs_dbm"],b["conditions"]["pavs_dbm"]
@@ -259,7 +260,7 @@ def run_hb(plan, progress=lambda p:None):
     checkpoint_dir=out/"checkpoints"; checkpoint_dir.mkdir(exist_ok=plan.get("_resume",False))
     c=HBContract.model_validate(plan["contract"])
     maps=[HBMapping.model_validate(m) for m in plan["mappings"]]
-    editor=NetlistEditor(plan["text"])
+    editors={v["case"]:NetlistEditor(v.get("network_text",plan["text"])) for v in plan["candidates"]}
     rows=[]; reused=0; attempts=0
     for number,(candidate,point) in enumerate(itertools.product(plan["candidates"],plan["operating_points"]),1):
         progress(dict(completed=len(rows),total=plan["total_cases"],phase="hb",current_case=number))
@@ -267,7 +268,7 @@ def run_hb(plan, progress=lambda p:None):
             raise ValueError("HB source/dependency changed; no further simulation dispatched")
         targets=[c.frequency_target,c.drive_target]+c.bias_targets+[m.target for m in maps]
         values=[point["freq_hz"],point["pavs_dbm"]]+point["bias_values"]+[candidate["parameters"][m.source_key]*m.scale for m in maps]
-        rendered=editor.render(targets,values)
+        rendered=editors[candidate["case"]].render(targets,values)
         digest=hashlib.sha256(rendered.encode()).hexdigest()
         saved=checkpoint_dir/f"{number:04d}.json"
         case=out/f"case_{number:04d}"
@@ -290,6 +291,10 @@ def run_hb(plan, progress=lambda p:None):
                 row.update(status="done",**result)
             except Exception as exc:
                 row["error"]=f"{type(exc).__name__}: {exc}"
+                from pa_sweep import failure
+                row["diagnostic"]=failure(row,plan["contract"])
+                if row["diagnostic"]["log"]:
+                    row["simulator_log"]=row["diagnostic"]["log"]
             artifacts=[row[k] for k in ("dataset","harmonics_csv","simulator_log") if k in row]
             write_json(saved,dict(row=row,rendered_sha256=digest,hashes={p:sha256(p) for p in artifacts}))
         rows.append(row)
@@ -309,11 +314,23 @@ def run_hb(plan, progress=lambda p:None):
             worst_pout_dbm=min((r["pout_dbm"] for r in valid),default=None),worst_pae_pct=min((r["pae_pct"] for r in valid),default=None),
             worst_gain_db=min((r["gain_db"] for r in valid),default=None)))
     candidate_summary.sort(key=lambda r:(not r["passes_all_points"],-(r["worst_pae_pct"] if r["worst_pae_pct"] is not None else -1e99)))
+    from pa_sweep import operating_grid
+    grid=operating_grid(plan,rows)
+    diagnostics=[r for r in grid if r["status"]!="accepted"]
+    write_json(out/"operating_points.json",grid)
+    compression_rows=rows+[dict(candidate_id=r["candidate_id"],status="not_run",conditions={
+        "pavs_dbm":r["pavs_dbm"],"freq_hz":r["freq_hz"],"bias_values":r["bias_values"]})
+        for r in grid if r["status"]=="not_run"]
     summary=dict(status="completed" if complete else "partially_completed",completed=complete,output_dir=str(out),
         evaluated_cases=len(rows),successful_cases=len(good),failed_cases=len(rows)-len(good),simulation_attempts=attempt_count(out),
         new_simulation_attempts=attempts,resumed_cases=reused,feasible_cases=sum(r["feasible"] for r in good),
-        best_case=good[0] if good else None,candidate_review=candidate_summary,compression=compression_summary(rows),
+        best_case=good[0] if good else None,candidate_review=candidate_summary,compression=compression_summary(compression_rows),
+        operating_point_status=str(out/"operating_points.json"),first_unaccepted=next(iter(diagnostics),None),
+        first_failure=next((r for r in diagnostics if r["status"]!="not_run"),None),
         source_netlist_unchanged=unchanged,audit_passed=complete,cases_json=str(out/"cases.json"),contract=plan["contract"],
         scope="Single-tone nonlinear HB at sampled operating points; source/model/reference conditions are caller asserted; no measured performance or harmonic-order convergence guarantee")
+    if plan.get("workflow")=="hb_matching":
+        from pa_matching import comparison
+        summary["matching_comparison"]=comparison(out,plan,grid)
     write_json(out/"summary.json",summary)
     return summary

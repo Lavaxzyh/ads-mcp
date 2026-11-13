@@ -5,7 +5,6 @@ from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
-import shutil
 import time
 from typing import Literal
 import uuid
@@ -19,7 +18,7 @@ from workflow_trace import Trace
 
 
 class TaskRequest(Model):
-    operation: Literal['build','import','edit','inspect','simulate','status']
+    operation: Literal['build','import','edit','merge','inspect','simulate','status']
     request_id: str = Field(default='',pattern=r'^[A-Za-z0-9_-]{0,64}$')
     target: Target | None = None
     expected_revision: int | None = Field(default=None,ge=0)
@@ -30,9 +29,12 @@ class TaskRequest(Model):
     replacements: list[Replacement] = Field(default_factory=list,max_length=30)
     contract_after: Contract | None = None
     fresh: bool = False
+    review: str = ''
+    review_sha256: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
     simulation: dict | None = None
     after_revision: int = -1
     wait_seconds: int = Field(default=0,ge=0,le=25)
+    wait_until: Literal['change','terminal'] | None = None
 
     @model_validator(mode='after')
     def scope(self):
@@ -41,12 +43,14 @@ class TaskRequest(Model):
         allowed={'operation','request_id','target','expected_revision'}
         allowed|={'build':{'build_request','simulation'},'import':{'source','contract','simulation'},
                   'edit':{'changes','replacements','contract_after','simulation'},'inspect':{'fresh'},
-                  'simulate':{'simulation'},'status':{'after_revision','wait_seconds'}}[self.operation]
+                  'merge':{'review','review_sha256'},'simulate':{'simulation'},'status':{'after_revision','wait_seconds','wait_until'}}[self.operation]
         if self.model_fields_set-allowed:raise ValueError('Fields outside this operation: '+str(sorted(self.model_fields_set-allowed)))
         if self.operation=='build' and not self.build_request:raise ValueError('build_request is required')
         if self.operation=='import' and (self.source is None or self.target is None or self.contract is None):
             raise ValueError('import requires source, independent target and explicit contract')
         if self.operation=='edit' and not (self.changes or self.replacements):raise ValueError('Empty change set')
+        if self.operation=='merge' and not (self.review and self.review_sha256 and self.expected_revision is not None):
+            raise ValueError('Merge requires a fingerprinted review and expected_revision')
         if self.operation=='simulate' and self.simulation is None:raise ValueError('Explicit SP simulation authorization and evaluation required')
         if self.simulation is not None:
             from design_results import SimulateRequest
@@ -87,7 +91,12 @@ def environment_current(state):
             raise ValueError('ENVIRONMENT_CHANGED: ADS/model libraries changed; explicit revalidation required')
 
 
-def save_snapshot(snap,netlist,target,folder):
+def save_snapshot(snap,netlist,target,folder,trace):
+    with trace.span("export", "write verified netlist, snapshot and fingerprints"):
+        return _save_snapshot(snap,netlist,target,folder)
+
+
+def _save_snapshot(snap,netlist,target,folder):
     folder.mkdir(parents=True,exist_ok=True)
     net=folder/'verified.net';net.write_text(netlist,encoding='utf-8')
     path=folder/'snapshot.json'
@@ -135,7 +144,7 @@ def build(engine,req,root,folder,trace,state):
         result=execute(engine,plan,capture_snapshot=True)
     trace.native_timings(result['timings'])
     original=load_snapshot(result['snapshot'],result['snapshot_sha256'])
-    result.update(save_snapshot(original,Path(original['netlist']).read_text(encoding='utf-8'),target,folder))
+    result.update(save_snapshot(original,Path(original['netlist']).read_text(encoding='utf-8'),target,folder,trace))
     return result
 
 
@@ -149,13 +158,13 @@ def import_once(engine,req,root,folder,trace,state):
         if (target.library,target.cell)!=(req.source.library,req.source.cell):raise ValueError('Import must preserve library and cell identity')
         before=clone_workspace(source,Path(target.workspace))
     with trace.span('acceptance','read independent copy and record exact native graph'):
-        with opened_copy(engine,target) as design:
+        with trace.span('read_schematic','open and read independent schematic'), opened_copy(engine,target) as design:
             snap,netlist=read_design(design,req.contract)
             if not snap['complete']:raise ValueError('Unreadable native fields; cannot verify bounded edits')
             snap['capability_profile']=capture(design,root/'profiles')
     if manifest(source)!=before:raise ValueError('CONCURRENT_SOURCE_EDIT: original changed during import')
     state['original']={'target':req.source.model_dump(),'files':before,'read_only':True}
-    return {**save_snapshot(snap,netlist,target,folder),'native_open_verified':True,'source_unchanged':True}
+    return {**save_snapshot(snap,netlist,target,folder,trace),'native_open_verified':True,'source_unchanged':True}
 
 
 def edit(engine,req,root,folder,trace,state,before):
@@ -166,15 +175,7 @@ def edit(engine,req,root,folder,trace,state,before):
     with trace.span('preparation','freeze exact change list before native mutation'):
         review=plan_patch(patch.model_dump(),folder,owned_in_place=True)
     contract=req.contract_after or Contract.model_validate(state['contract'])
-    # Retain only the target cell's native files, not additional ADS workspaces.
-    backup=folder/'before-native';native=ws/target.library/target.cell
-    backup.mkdir()
-    for name,h in before['source_files'].items():
-        p=ws/name
-        if p.is_relative_to(native):
-            dest=backup/name;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,dest)
-            if file_hash(dest)!=h:raise ValueError('Concurrent change while preserving native revision')
-    with trace.span('rework','apply only requested edits to the same owned schematic'):
+    with trace.span('rework','apply only requested edits to the same owned schematic'), trace.span('edit_schematic','native edit through save'):
         with opened_copy(engine,target,writable=True) as design:
             with get_de().db.Transaction(design,'Single-task bounded delta') as tx:
                 mutate_design(design,patch);tx.commit()
@@ -183,11 +184,11 @@ def edit(engine,req,root,folder,trace,state,before):
             if manifest(ws)!=before['source_files']:raise ValueError('CONCURRENT_TASK_EDIT: disk changed before save')
             design.save_design()
     with trace.span('acceptance','reopen and verify parameters, connectivity and saved netlist'):
-        with opened_copy(engine,target) as design:saved,saved_netlist=read_design(design,contract)
+        with trace.span('read_schematic','reopen edited schematic'), opened_copy(engine,target) as design:saved,saved_netlist=read_design(design,contract)
         if structural(saved)!=structural(after) or not same_netlist_after_replacement(netlist,saved_netlist,{r.instance for r in req.replacements}):
             raise ValueError('SAVE_REOPEN_MISMATCH: keep revision evidence and stop')
-    return {**save_snapshot(saved,saved_netlist,target,folder),'changes':delta,'review':review,
-        'connectivity_unchanged':True,'save_reopen_verified':True,'native_backup':str(backup)}
+    return {**save_snapshot(saved,saved_netlist,target,folder,trace),'changes':delta,'review':review,
+        'connectivity_unchanged':True,'save_reopen_verified':True}
 
 
 def summary(state,op,record,status='completed',**extra):
@@ -217,9 +218,12 @@ def _run(req,root,engine,trace):
         if state is None:raise ValueError('No schematic is bound to this task')
         if state.get('simulation'):
             from single_schematic_sim import poll
-            return poll(state,root,req.after_revision,req.wait_seconds)
+            return poll(state,root,req.after_revision,req.wait_seconds,req.wait_until)
         return summary(state,'status',statefile,status=state['status'],pending=state.get('pending'))
-    request_hash=digest(json.dumps(req.model_dump(),sort_keys=True).encode())
+    # Status-only options must never change the identity of an existing mutation.
+    excluded = {'wait_until'} if req.operation == 'merge' else {'wait_until','review','review_sha256'}
+    hash_fields=req.model_dump(exclude=excluded)
+    request_hash=digest(json.dumps(hash_fields,sort_keys=True).encode())
     input_hash=file_hash(req.build_request) if req.operation=='build' else None
     if input_hash:request_hash=digest((request_hash+input_hash).encode())
     folder=root/'operations'/(req.request_id or ('inspect-'+uuid.uuid4().hex))
@@ -273,29 +277,39 @@ def _run(req,root,engine,trace):
     guard=edit_guard(ws) if ws and ws.exists() else nullcontext()
     try:
         with guard:
+            backup = None
+            if req.operation in ('edit','merge'):
+                from schematic_backup import checkpoint
+                backup = checkpoint(root, state, before['source_files'])
+                atomic_json(folder/'before-native'/'checkpoint.json', backup)
             if req.operation=='build':result=build(engine,req,root,folder,trace,state)
             elif req.operation=='import':result=import_once(engine,req,root,folder,trace,state)
             elif req.operation=='edit':result=edit(engine,req,root,folder,trace,state,before)
+            elif req.operation=='merge':
+                from schematic_merge import apply_review
+                result=apply_review(req,root,state,engine,folder,trace)
             elif req.operation=='inspect':
                 target=Target.model_validate(state['target'])
                 with trace.span('acceptance','explicit fresh native inspection'):
-                    with opened_copy(engine,target) as design:snap,netlist=read_design(design,Contract.model_validate(state['contract']))
+                    with trace.span('read_schematic','explicit fresh read'), opened_copy(engine,target) as design:snap,netlist=read_design(design,Contract.model_validate(state['contract']))
                 # File bytes were already hashed by snapshot(); compare native
                 # text with universal-newline file text, not LF text to CRLF bytes.
                 if structural(snap)!=structural(before) or netlist.replace('\r\n','\n')!=Path(before['netlist']).read_text(encoding='utf-8'):
                     raise ValueError('Fresh native read differs from the frozen snapshot')
                 result={'fresh_native_verified':True}
             else:result={}
+            if backup:
+                result.update(checkpoint=backup, native_backup=str(folder/'before-native'))
             if result.get('snapshot'):bind_snapshot(state,result)
-            if req.operation in ('build','import','edit'):state['revision']+=1
+            if req.operation in ('build','import','edit','merge'):state['revision']+=1
             state.update(status='ready',pending=None)
             # The simulator reuses the existing durable serial RF executor.
             if req.simulation:
                 from single_schematic_sim import submit
                 result['simulation']=submit(req.simulation,state,root,folder)
             response=summary(state,req.operation,record,status='submitted' if result.get('simulation',{}).get('job_id') and not result['simulation'].get('cache_hit') else 'completed',elapsed_seconds=round(time.perf_counter()-started,6),
-                changes=len(result.get('changes',[])),acceptance={'saved_reopened':req.operation in ('build','edit'),
-                    'connectivity_verified':req.operation in ('build','edit'),
+                changes=len(result.get('changes',[])),acceptance={'saved_reopened':req.operation in ('build','edit','merge'),
+                    'connectivity_verified':req.operation in ('build','edit','merge'),
                     **({'native_read_verified':True,'original_unchanged':True} if req.operation=='import' else {})},
                 simulation=result.get('simulation',{'status':'not_requested'}))
             atomic_json(record,{**result,**response,'snapshot':state.get('snapshot'),'snapshot_sha256':state.get('snapshot_sha256'),

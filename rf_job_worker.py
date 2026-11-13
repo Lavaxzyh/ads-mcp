@@ -50,6 +50,8 @@ def run_job(store, row):
         out.mkdir(parents=True,exist_ok=False)
         write_json(marker,dict(job_id=job_id,plan_hash=row["plan_hash"]))
         plan["_resume"]=True
+        write_json(out/"queue-timing.json", dict(job_id=job_id,
+                   initial_queue_seconds=row["claimed_at"] - row["created"]))
     # Pin implementation version; a resumed job must not silently change algorithms.
     code_hashes={p.name:sha256(p) for p in Path(__file__).parent.glob("*.py")}
     code_file=out/"code-fingerprint.json"
@@ -81,9 +83,12 @@ def run_job(store, row):
     executor=Executor(store.root/job_id, cancel_check, lambda p,b:store.update(job_id,worker_pid=p,worker_born=b))
     plan["_executor"]=executor
     try:
-        if row["kind"]=="hb":
+        if row["kind"] in ("hb","hb_matching"):
             from hb_review import run_hb
             result=run_hb(plan,progress)
+        elif row["kind"] in ("topologies","parasitics"):
+            from matching_comparison import run_comparison
+            result=run_comparison(plan,progress)
         elif row["kind"]=="optimize":
             from rf_optimizer import run_optimization
             result=run_optimization(plan,progress)
@@ -120,9 +125,10 @@ def main():
             if row is None:
                 db.execute("UPDATE dispatcher SET pid=NULL,born=NULL WHERE id=1")
                 return
-            db.execute("UPDATE jobs SET status='running',revision=revision+1,updated=?,error=NULL WHERE id=?",(time.time(),row["id"]))
+            claimed_at = time.time()
+            db.execute("UPDATE jobs SET status='running',revision=revision+1,updated=?,error=NULL WHERE id=?",(claimed_at,row["id"]))
         try:
-            run_job(store,dict(row))
+            run_job(store,dict(row, claimed_at=claimed_at))
         except Exception as exc:
             store.update(row["id"],status="failed",error=f"{type(exc).__name__}: {exc}")
 

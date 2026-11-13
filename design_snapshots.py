@@ -10,6 +10,7 @@ import re
 import shutil
 import uuid
 
+from workspace_diagnostics import DEFINITION, library_path
 from pydantic import Field
 from schematic_flow import Model, Target, Contract, atomic_json, digest, target_lock
 
@@ -22,7 +23,7 @@ class ExportRequest(Model):
 def file_hash(path): return digest(Path(path).read_bytes())
 
 
-def manifest(root: Path):
+def manifest(root: Path, *, require_workspace=True):
     """Hash source content; only known runtime/our receipt files are excluded."""
     root = root.resolve(strict=True)
     if not root.is_dir(): raise ValueError('Source workspace must be a directory')
@@ -38,7 +39,7 @@ def manifest(root: Path):
             if p.suffix.lower() in ('.log','.lock','.cdslck','.pyc') or name.endswith('.lck'):continue
             out[str(p.relative_to(root)).replace('\\','/')]=file_hash(p)
             if len(out)>25000:raise ValueError('Source exceeds the bounded 25000-file snapshot limit')
-    if 'lib.defs' not in out:raise ValueError('Source is not an ADS workspace (lib.defs missing)')
+    if require_workspace and 'lib.defs' not in out:raise ValueError('Source is not an ADS workspace (lib.defs missing)')
     return out
 
 
@@ -57,21 +58,21 @@ def clone_workspace(source: Path, destination: Path, expected=None):
         if not rel.endswith('.defs'):continue
         text=(source/rel).read_text(encoding='utf-8-sig')
         rendered=[]
-        for line in text.splitlines():
-            m=re.match(r'\s*(DEFINE\s+\S+\s+|INCLUDE\s+)(.+?)\s*$',line,re.I)
+        for number,line in enumerate(text.splitlines(),1):
+            m=DEFINITION.match(line)
             if not m:rendered.append(line);continue
-            raw=m[2].strip().strip('"')
-            expanded=raw.replace('$HPEESOF_DIR',str(ads)).replace('${HPEESOF_DIR}',str(ads))
-            if '$' in expanded:raise ValueError('Unresolved library variable: '+raw)
-            p=Path(expanded)
-            p=(source/Path(rel).parent/p).resolve() if not p.is_absolute() else p.resolve()
+            try:
+                p=library_path(m[3],(source/rel).parent,ads)
+            except ValueError as exc:
+                raise ValueError(f"{source/rel}:{number}: {exc}; check this DEFINE/INCLUDE path") from exc
             if p.is_relative_to(source):
                 new=destination/p.relative_to(source)
                 # ADS lib.defs does not use shell-style double quotes. Keep
                 # workspace-local libraries relative so the copy is portable.
                 rendered.append(m[1]+Path(os.path.relpath(new,destination/Path(rel).parent)).as_posix())
             elif p.is_relative_to(ads):rendered.append(line)
-            else:raise ValueError('External user library must be explicitly copied before editing: '+str(p))
+            else:
+                raise ValueError(f"{source/rel}:{number}: External user library must be explicitly copied before editing: {p}")
         defs[rel]='\n'.join(rendered)+'\n'
     destination.parent.mkdir(parents=True,exist_ok=True)
     shutil.copytree(source,destination,ignore=shutil.ignore_patterns('.ads-mcp','.git','__pycache__','*.lock','*.cdslck','*.lck'))

@@ -2,9 +2,9 @@
 
 [简体中文](README.zh-CN.md) · [Upstream project](https://github.com/Lavaxzyh/ads-mcp) · [MIT license](LICENSE)
 
-This is the **ADS 2025 adaptation and RF/PA workflow branch** of [Lavaxzyh/ads-mcp](https://github.com/Lavaxzyh/ads-mcp), maintained on **`feature/power-amplifier`**. It builds on the author's v0.4.0 native schematic/Layout/Momentum/emModel foundation, preserves all **49 upstream tool names**, and registers **64 tools** in total.
+This is the **ADS 2025 adaptation and RF/PA workflow branch** of [Lavaxzyh/ads-mcp](https://github.com/Lavaxzyh/ads-mcp), maintained on **`feature/power-amplifier`**. The default `full` server registers **67 tools**, including all **49 upstream tool names**. The private schematic client defaults to the seven-tool `workflow` profile for editing, simulation and RF review.
 
-**Branch release: `0.4.0+ads2025.20261030.3`**. This is a branch-specific version, not a new upstream release. Implementation ancestry is upstream commit `72e2793`; the contribution branch was prepared from `0181a5b` (the subsequent upstream change only updates a README badge).
+This update builds on `18e1ed4`, the upstream merge of [PR #1](https://github.com/Lavaxzyh/ads-mcp/pull/1). The branch version is `0.4.0+ads2025.20261030.3`. Use the `build_id` from `ads_runtime_selfcheck` to identify the exact running code.
 
 The focus is practical ADS 2025 compatibility, explicit engineering inputs, repeatable PA-related analysis, and a compact **one task / one schematic** workflow. This is not an autonomous PA designer or an official Keysight product.
 
@@ -31,13 +31,11 @@ Use Windows and a licensed ADS 2025 installation. Native validation used ADS 202
 Replace placeholders with your own absolute paths; keep outputs outside the checkout.
 
 ```powershell
-git clone --branch feature/power-amplifier https://github.com/Lavaxzyh/ads-mcp.git
+git clone --branch feature/power-amplifier https://github.com/armkeny-byte/ads-mcp.git
 cd ads-mcp
 & '<ADS_INSTALL>/tools/python/python.exe' -m venv --system-site-packages .venv
 & '.venv/Scripts/python.exe' -m pip install -r requirements.txt
 ```
-
-Until this contribution is merged, use the contributor's fork URL or reviewed archive; do not assume upstream already includes this code.
 
 ```json
 {
@@ -73,12 +71,13 @@ Run `ads_runtime_selfcheck` when starting or updating. An existing process may s
 
 - [One schematic](SINGLE-SCHEMATIC.zh-CN.md), [extraction/reviewed copies](DESIGN-WORKFLOW.zh-CN.md), [full BuildPlan](SCHEMATIC-WORKFLOW.zh-CN.md).
 - [Load-pull/scans](RF-WORKFLOWS.zh-CN.md), [targets/search/tolerance](RF-ADVANCED.zh-CN.md), [RF jobs and HB review](RF-JOBS.zh-CN.md).
+- [Input/output matching on separate copies, schematic merge, and PA/EM review](PA-WORKFLOWS.zh-CN.md).
 - [ADS 2025 native EM and owned GUI](EM-WORKFLOW.zh-CN.md).
 - [Validation and efficiency](docs/VALIDATION.zh-CN.md), [privacy](docs/PRIVACY.zh-CN.md), [contributing](CONTRIBUTING.md).
 
-Run `python -B tools/run_unit_tests.py`. This publication passed **201 unit tests** and a **real ADS 2025 synthetic build/edit/save/reopen check**. Historical SP/EM evidence is reported separately. Original upstream examples retain their provenance and are not all revalidated on this branch.
+Run `python -B tools/run_unit_tests.py`. This update passed **237 unit tests** and **five native ADS 2025 checks** covering workspace write protection, pin connectivity, complex two-port SP, a saved matching-network edit and single-tone HB.
 
-In the preceding local efficiency release, a prepared build + two edits + rejected edit took median 8.12 s versus 9.52 s with a reused session (n=3); calls fell from 7 to 4 and returned UTF-8 text from 5,525 to 2,158 bytes. Cold startup did not improve. These are bounded scripted measurements, **not complete RF-design time or actual model-token savings**. The public fixture uses different synthetic example values and does not reproduce that historical timing workload.
+On a three-frequency series-resistor fixture, editing, solving and repeating the same request with the cache took a median of 18.12 s before the update (five runs), 9.22 s with the new full catalog (three runs) and 9.78 s with the workflow catalog (five runs). Offline `o200k_base` counts for the tool definitions were 16,899, 13,946 and 1,125 tokens respectively. Provider billing was unobserved. [Test conditions and scope](docs/VALIDATION.zh-CN.md)
 
 ## Privacy and attribution
 

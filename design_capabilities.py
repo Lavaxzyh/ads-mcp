@@ -15,16 +15,17 @@ def inventory(path):
     path=Path(path)
     if not path.exists():return {'missing':str(path)}
     result={}
-    def visit(folder):
+    def visit(folder, prefix):
         with os.scandir(folder) as entries:
             for entry in entries:
                 if entry.name=='__pycache__':continue
                 if entry.is_symlink() or (hasattr(entry,'is_junction') and entry.is_junction()):
                     _LINKED_TREES.add(str(path.resolve()))
-                if entry.is_dir(follow_symlinks=False):visit(entry.path)
-                elif entry.is_file() and Path(entry.name).suffix not in ('.pyc','.log','.lock'):
-                    stat=entry.stat();result[Path(entry.path).relative_to(path).as_posix()]=[stat.st_size,stat.st_mtime_ns]
-    visit(path)
+                key = prefix + entry.name
+                if entry.is_dir(follow_symlinks=False):visit(entry.path, key + "/")
+                elif entry.is_file() and os.path.splitext(entry.name)[1] not in ('.pyc','.log','.lock'):
+                    stat=entry.stat();result[key]=[stat.st_size,stat.st_mtime_ns]
+    visit(path, "")
     return dict(sorted(result.items()))
 
 

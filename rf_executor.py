@@ -89,7 +89,6 @@ class Executor:
         self.folder.mkdir(parents=True)
         self.control, self.register = control, register
         self.process = None
-        self.sequence = 0
         self.starts = 0
 
     def start(self):
@@ -111,14 +110,14 @@ class Executor:
         case.mkdir(parents=True, exist_ok=False)
         (case/"input.net").write_text(rendered, encoding="utf-8")
         write_json(case/"request.json", dict(evaluation=evaluation, data_directory=data_directory, **(extra or {})))
-        self.sequence += 1
-        write_json(self.folder/"next.json", dict(sequence=self.sequence, request_file=str(case/"request.json")))
+        write_json(self.folder/"next.json", dict(request_file=str(case/"request.json")))
+        # Each case is a new directory. Its final result is atomically published once.
+        receipt = case/"result.json"
         started = time.monotonic()
         try:
             while True:
                 self.control()
-                done = self.folder/"done.json"
-                if done.exists() and json.loads(done.read_text(encoding="utf-8"))["sequence"] == self.sequence:
+                if receipt.is_file():
                     break
                 if self.process.poll() is not None:
                     raise RuntimeError(f"Simulator host exited ({self.process.returncode}); see {self.folder/'host.log'}")
@@ -128,7 +127,7 @@ class Executor:
         except BaseException:
             self.close(force=True)
             raise
-        result = json.loads((case/"result.json").read_text(encoding="utf-8"))
+        result = json.loads(receipt.read_text(encoding="utf-8"))
         if not result.get("ok"):
             raise RuntimeError(result.get("error", "Native worker failed"))
         return {k:v for k,v in result.items() if k != "ok"}

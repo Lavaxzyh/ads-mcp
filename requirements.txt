@@ -3,5 +3,6 @@ pydantic>=2,<3
 numpy
 pandas
 matplotlib
+scikit-rf>=1.0
 psutil
 pywin32; sys_platform == "win32"

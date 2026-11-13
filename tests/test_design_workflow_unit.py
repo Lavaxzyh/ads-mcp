@@ -1,11 +1,34 @@
 import copy
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from schematic_templates import expand, catalog
 from workflow_trace import Trace
+from design_workflow import dispatch
+
+
+class InlineRun(unittest.TestCase):
+    def test_file_and_inline_status_share_validation_and_task_ownership(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"ADS_MCP_TASK_DIR": tmp}):
+            root=Path(tmp).resolve()
+            state={"kind":"single_schematic_task","task_directory":str(root),"revision":3,"status":"ready"}
+            (root/"task.json").write_text(json.dumps(state),encoding="utf-8")
+            request={"operation":"status"}
+            path=root/"status.json"
+            path.write_text(json.dumps(request),encoding="utf-8")
+            self.assertEqual(dispatch("run",path,root,None),dispatch("run","",root,None,request))
+            with self.assertRaisesRegex(ValueError,"another task"):
+                dispatch("run","",root/"other",None,request)
+            with self.assertRaisesRegex(ValueError,"no request_file"):
+                dispatch("run",path,root,None,request)
+            with self.assertRaisesRegex(ValueError,"only supported"):
+                dispatch("build","",root,None,request)
+            with self.assertRaisesRegex(ValueError,"512 KB"):
+                dispatch("run","",root,None,{"field":"长"*200000})
 
 
 class Templates(unittest.TestCase):

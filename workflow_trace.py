@@ -12,7 +12,7 @@ import uuid
 
 from schematic_flow import atomic_json, target_lock
 
-PHASES = ('materials', 'preparation', 'configuration', 'service_startup', 'build',
+PHASES = ('read_schematic','edit_schematic','export','materials', 'preparation', 'configuration', 'service_startup', 'build',
           'acceptance', 'rework', 'simulation', 'service_shutdown')
 
 
@@ -115,8 +115,34 @@ class Trace:
         return {'trace': str(self.path), 'calls': len(d['calls']),
                 'input_bytes': sum(c['input_bytes'] for c in d['calls']),
                 'output_bytes': sum(c['output_bytes'] for c in d['calls']),
-                'phase_elapsed_seconds':phases,'phase_note':'Per-phase observed interval union; different phases may overlap and must not be summed into end-to-end time.',
+                'phase_elapsed_seconds':phases,'task_breakdown':self.task_breakdown(phases),
+                'phase_note':'Per-phase observed interval union; different phases may overlap and must not be summed into end-to-end time.',
                 'model_token_usage':d.get('model_token_usage',{'status':'unobserved'}),
                 'byte_measurement':'UTF-8 payload proxy only; not model tokens or billing',
                 'unobserved': d['unobserved'],
                 'open_spans': [s['id'] for s in d['spans'] if s['status'] == 'running']}
+
+    def task_breakdown(self, phases):
+        """Sum persisted SP evidence by operation, independently of status polling."""
+        def records(pattern):
+            return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(self.directory.glob(pattern))]
+        starts = records("startup-*.json")
+        queues = records("operations/*/simulation/queue-timing.json")
+        cases = records("operations/*/simulation/**/sp-timing.json")
+        evidence = records("operations/*/evidence.json")
+        unmeasured = [str(p) for p in self.directory.glob("operations/*/simulation/case_*/input.net")
+                      if not (p.parent/"sp-timing.json").is_file()]
+        def seconds(rows, key):
+            values = [row[key] for row in rows if row.get(key) is not None]
+            return sum(values) if values else None
+        return {
+            "scope": "Bound schematic task and its SP jobs. Seconds at measured boundaries; null means unobserved.",
+            "startup_to_handshake_seconds": phases.get("service_startup"),
+            "server_startups": starts, "read_seconds": phases.get("read_schematic"),
+            "edit_seconds": phases.get("edit_schematic"), "queue_seconds": seconds(queues,"initial_queue_seconds"),
+            "solve_seconds": seconds(cases,"solve_seconds"), "schematic_export_seconds": phases.get("export"),
+            "result_export_seconds": seconds(cases,"export_seconds"),
+            "observed_native_attempts": sum(row["native_attempts"] for row in cases),
+            "simulation_cache_hits": sum(row.get("cache_hit") is True for row in evidence),
+            "cases_without_timing": unmeasured,
+        }

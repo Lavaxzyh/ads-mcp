@@ -123,6 +123,21 @@ class HBTests(unittest.TestCase):
 
 
 class JobTests(unittest.TestCase):
+    def test_bounded_wait_suppresses_progress_and_preserves_job_state(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(JobStore, "ensure_dispatch"):
+            store = JobStore(Path(tmp)/"queue")
+            job = store.submit("sp", {"output_dir": str(Path(tmp)/"out")})["job_id"]
+            self.assertEqual(store.wait(job, timeout_seconds=0, wait_until="terminal")["status"], "queued")
+            self.assertEqual(store.wait(job, wait_until="change")["status"], "queued")
+            transitions = iter(("running", "paused"))
+            def advance(_seconds):
+                store.update(job, status=next(transitions))
+            with patch("rf_jobs.time.sleep", side_effect=advance) as sleep:
+                self.assertEqual(store.wait(job, wait_until="terminal")["status"], "paused")
+                self.assertEqual(sleep.call_count, 2)
+            store.update(job, status="failed", error="solver error")
+            self.assertEqual(store.wait(job, wait_until="terminal")["error"], "solver error")
+
     def test_pid_reuse_is_not_liveness(self):
         import psutil
         p=psutil.Process()

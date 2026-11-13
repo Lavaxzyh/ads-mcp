@@ -52,9 +52,13 @@ def data_dependencies(text,data_directory,workspace):
             if p.is_symlink() or p.is_junction():raise ValueError('Linked data dependency needs explicit handling')
             if p.is_file():files.add(p)
             if len(files)>25000:raise ValueError('Data dependencies exceed bounded fingerprint limit')
-    for raw in re.findall(r'"([^"\r\n]+\.(?:s\d+p|mdf|mdif|dat|net|ckt|lib|mdl|csv))"',text,re.I):
-        if '$' in raw:raise ValueError('Unresolved model-data path prevents same-condition evidence: '+raw)
-        p=Path(raw);p=p.resolve(strict=True) if p.is_absolute() else (root/p).resolve(strict=True)
+    from workspace_diagnostics import file_references
+    for line,instance,raw in file_references(text):
+        if '$' in raw:
+            raise ValueError(f"Netlist line {line}, {instance or 'include'}: resolve the model-data path {raw}")
+        p=(root/raw).resolve()
+        if not p.is_file():
+            raise FileNotFoundError(f"Netlist line {line}, {instance or 'include'}: {p} missing; check the file and data_directory")
         files.add(p)
     return {str(p):file_hash(p) for p in sorted(files)}
 
@@ -178,9 +182,10 @@ def plan_candidate(payload,task_directory):
            'raw_sparameters':row['raw_sparameters'],'mapping':mapping}
     review=plan_patch({'snapshot':req.snapshot,'snapshot_sha256':req.snapshot_sha256,
                        'destination':req.destination,'changes':changes},task_directory)
+    proof['impedance_contract']=evaluation.impedance_contract()
     path=Path(review['review']);data=json.loads(path.read_text(encoding='utf-8'));data['candidate']=proof
     atomic_json(path,data);review.update(review_sha256=file_hash(path),parameter_mapping=mapping,case=req.case)
-    return review
+    return {**review, 'impedance_contract':proof['impedance_contract']}
 
 
 def verify_candidate(proof,netlist=None):
@@ -211,6 +216,7 @@ def materialize(engine,payload,task_directory):
     if 'candidate' not in review:raise ValueError('Use plan_candidate first')
     proof=review['candidate'];verify_candidate(proof)
     result=apply_patch(engine,req.model_dump(include={'review','review_sha256'}),task_directory)
+    result['impedance_contract']=MatchingEvaluation.model_validate(proof['evaluation']).impedance_contract()
     if req.simulation=='verify_same_conditions':
         check=simulate({'snapshot':result['snapshot'],'snapshot_sha256':result['snapshot_sha256'],
                         'authorization':'run_linear_sp_on_copy','evaluation':proof['evaluation'],
@@ -251,9 +257,11 @@ def evidence(path,expected_hash,snapshot_path,snapshot_hash):
 
 def compare(payload,task_directory):
     import pandas as pd
+    from schematic_graph import describe
     req=ComparisonRequest.model_validate(payload)
     a=load_snapshot(req.left,req.left_sha256);b=load_snapshot(req.right,req.right_sha256)
     result={'ok':True,'status':'structural_comparison','changes':changes_between(a,b),
+            'schematic_diff':describe(a,b),
             'left_gaps':a['unreadable'],'right_gaps':b['unreadable'],'performance':'No corresponding compatible simulation evidence supplied'}
     if req.left_evidence and req.right_evidence:
         try:

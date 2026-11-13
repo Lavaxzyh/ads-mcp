@@ -8,12 +8,15 @@ Run:  <ads-mcp>/.venv/Scripts/python.exe mcp_server.py   (stdio transport)
 """
 from __future__ import annotations
 
+import time
+_PROCESS_START = time.perf_counter()
+
 import json
 import os
 import functools
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from runtime_identity import RuntimeIdentity
 _RUNTIME_IDENTITY = RuntimeIdentity(Path(__file__).resolve().parent)
@@ -57,7 +60,15 @@ different evidence. Metadata, initial values or SP do not establish PA power,
 PAE or stability. No Computer Use, global ADS changes or other-session restarts.
 """
 
-mcp = FastMCP("ads-mcp", instructions=INSTRUCTIONS)
+from tool_profiles import ProfileTools
+PROFILE = os.environ.get("ADS_MCP_PROFILE", "full")
+instructions = INSTRUCTIONS if PROFILE == "full" else (
+    f"ADS {PROFILE} profile. Use ads_runtime_selfcheck for the active catalog; "
+    "use ads_design_workflow on an independent task-owned schematic. "
+    "Specify ports, units and reference planes. Only run authorized simulations."
+)
+mcp = FastMCP("ads-mcp", instructions=instructions)
+tools = ProfileTools(mcp, PROFILE)
 # FastMCP does not expose the server version; report ours instead of the SDK's
 mcp._mcp_server.version = __version__
 engine = AdsEngine()
@@ -66,6 +77,26 @@ momentum = MomentumRunner(get_ads_install_dir() / "bin" / "ads-mcp.exe")
 em_modeler = EmModeler()
 circuit_runner = CircuitRunner()
 _workspace_dispatch_lock = threading.RLock()
+
+
+@tools.tool()
+def ads_diagnose_workspace(workspace: str, netlist_path: str = "", data_directory: str = "",
+                           solver_log: str = "") -> dict:
+    """Inspect workspace lib.defs, literal model/data paths and the first solver error."""
+    from workspace_diagnostics import inspect
+    return inspect(workspace, netlist_path, data_directory, solver_log)
+
+
+@tools.tool()
+def ads_prepare_schematic_edit(task_directory: str = "", instance: str = "", key: str = "",
+                               value: str | None = None, field: str = "parameters") -> dict:
+    """List editable scalar fields of a bound schematic, or prepare a reviewed run request.
+
+    Filter by instance. Select instance, key, field (parameters/variables) and value
+    including its ADS unit. Returns next_call for ads_design_workflow; no native write.
+    """
+    from edit_requests import prepare
+    return prepare(task_directory or os.environ.get("ADS_MCP_TASK_DIR", ""), instance, key, value, field)
 
 
 def _serialize_workspace(fn):
@@ -92,7 +123,7 @@ def _ensure_no_running_tasks() -> None:
         raise StateError("a simulation task is running; poll ads_get_sim_status before changing workspaces or starting another")
 
 
-@mcp.tool()
+@tools.tool()
 def ads_check_installed() -> dict[str, Any]:
     """Check ADS install, simulator binary, and the headless DE engine."""
     try:
@@ -101,18 +132,17 @@ def ads_check_installed() -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_runtime_selfcheck(client_tool_names: list[str] | None = None,
                           disabled_tools: list[str] | None = None,
-                          expected_build_id: str | None = None) -> dict[str, Any]:
-    """Identify this running build, disk changes, ADS environment and optional client catalog.
-
-    Read-only. Pass actual client tool names to detect an old/filtered catalog;
-    declare intentional exclusions with disabled_tools. Never restarts sessions.
-    """
+                          expected_build_id: str | None = None,
+                          detail: Literal["summary", "full"] | None = None) -> dict[str, Any]:
+    """Check build, ADS and catalog. Pass observed client_tool_names and intentional disabled_tools.
+    The workflow profile defaults to summary. Select full for paths, tools, GUI sessions and limits."""
     report = _RUNTIME_IDENTITY.report(mcp._tool_manager._tools.keys(),
         client_tool_names=client_tool_names, disabled_tools=disabled_tools,
         expected_build_id=expected_build_id)
+    report['tool_catalog']['profile'] = PROFILE
     install = get_ads_install_dir()
     try:
         report['ads'] = engine.check_installed()
@@ -128,6 +158,18 @@ def ads_runtime_selfcheck(client_tool_names: list[str] | None = None,
         'managed_ads2025_bridge': (Path(__file__).parent/'gui_bridge_bootstrap.py').is_file(),
         'mcp_python_packages':modules,'missing_mcp_packages':[n for n,present in modules.items() if not present],
         'note':'The MCP virtualenv and native ADS GUI Python are separate interpreters; managed GUI code uses native ADS/PySide2 plus stdlib.'}
+    if detail == 'summary' or (detail is None and PROFILE == 'workflow'):
+        catalog = report['tool_catalog']
+        return _ok(version=report['version'], build_id=report['build_id'],
+                   expected_build_matches=report['expected_build_matches'],
+                   fresh_server_required=report['fresh_server_required'],
+                   files_changed_since_start=report['files_changed_since_start'],
+                   ads={key: value for key, value in report['ads'].items()
+                        if key in ('ok', 'error', 'install', 'native_product_version', 'de_automation_mode')},
+                   tool_catalog={key: value for key, value in catalog.items() if key != 'registered'},
+                   missing_mcp_packages=report['dependencies']['missing_mcp_packages'],
+                   official_gui_bridge=report['dependencies']['official_gui_bridge'],
+                   managed_ads2025_bridge=report['dependencies']['managed_ads2025_bridge'])
     from gui_bridge_2025 import discover
     report['owned_gui_sessions']=discover()
     report['known_limits'] = [
@@ -141,7 +183,7 @@ def ads_runtime_selfcheck(client_tool_names: list[str] | None = None,
     return _ok(**report)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_manage_gui_session(action: str, task_directory: str = '', workspace: str = '',
                            session_id: int | None = None) -> dict[str, Any]:
     """Start/list/stop only task-owned ADS 2025 GUI sessions in independent workspaces.
@@ -170,7 +212,7 @@ def ads_manage_gui_session(action: str, task_directory: str = '', workspace: str
     raise ValueError('action must be start, list or stop')
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_create_workspace(path: str = "") -> dict[str, Any]:
     """Create (or open if existing) an ADS workspace at `path` and open it."""
@@ -186,7 +228,7 @@ def ads_create_workspace(path: str = "") -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_open_workspace(path: str) -> dict[str, Any]:
     """Open an existing ADS workspace."""
@@ -201,7 +243,7 @@ def ads_open_workspace(path: str) -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_close_workspace() -> dict[str, Any]:
     """Close the currently open workspace."""
@@ -216,13 +258,13 @@ def ads_close_workspace() -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_session_status() -> dict[str, Any]:
     """Return session state: open workspace, current schematic, task history."""
     return _ok(**state.snapshot())
 
 
-@mcp.tool()
+@tools.tool()
 def ads_create_library(name: str) -> dict[str, Any]:
     """Create a design library inside the open workspace and attach it."""
     try:
@@ -232,7 +274,7 @@ def ads_create_library(name: str) -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_create_schematic(lib: str, cell: str) -> dict[str, Any]:
     """Create (or open) a schematic cell `lib:cell` as the current design."""
     try:
@@ -244,7 +286,7 @@ def ads_create_schematic(lib: str, cell: str) -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_browse_components(lib: str = "") -> dict[str, Any]:
     """List component libraries and cells (with known parameter names).
 
@@ -258,7 +300,7 @@ def ads_browse_components(lib: str = "") -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_place_component(
     lib: str,
     cell: str,
@@ -287,7 +329,7 @@ def ads_place_component(
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_add_wire(points: list[list[float]], label: str = "") -> dict[str, Any]:
     """Add a polyline wire through `points` [[x1,y1],[x2,y2],...]; optional net label."""
     try:
@@ -297,7 +339,7 @@ def ads_add_wire(points: list[list[float]], label: str = "") -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_add_var(name: str, value: str, opt_min: str = "", opt_max: str = "") -> dict[str, Any]:
     """Define a schematic variable in the VAR block, e.g. ("W_hi", "0.3 mm").
 
@@ -312,7 +354,7 @@ def ads_add_var(name: str, value: str, opt_min: str = "", opt_max: str = "") -> 
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_add_goal(expr: str, sim_name: str, goal_type: str, bound: str,
                  fmin: str, fmax: str, weight: float = 1.0) -> dict[str, Any]:
     """Add an optimization goal (ads_simulation:Goal).
@@ -329,7 +371,7 @@ def ads_add_goal(expr: str, sim_name: str, goal_type: str, bound: str,
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_add_optim(optim_type: str = "gradient", max_iters: int = 60) -> dict[str, Any]:
     """Place the optimization controller (ads_simulation:Optim).
 
@@ -343,7 +385,7 @@ def ads_add_optim(optim_type: str = "gradient", max_iters: int = 60) -> dict[str
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_add_term(name: str, x: float, y: float, z: str = "50 Ohm") -> dict[str, Any]:
     """Place an S-parameter port (Term) with its ground; name like Term1/Term2."""
     try:
@@ -353,7 +395,7 @@ def ads_add_term(name: str, x: float, y: float, z: str = "50 Ohm") -> dict[str, 
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_add_ground(x: float, y: float) -> dict[str, Any]:
     """Place a ground symbol at (x, y)."""
     try:
@@ -363,7 +405,7 @@ def ads_add_ground(x: float, y: float) -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_list_instances() -> dict[str, Any]:
     """List instances placed on the current schematic."""
     try:
@@ -372,7 +414,7 @@ def ads_list_instances() -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_generate_netlist(save: bool = True) -> dict[str, Any]:
     """Generate the netlist of the current schematic and return its text."""
     try:
@@ -384,7 +426,7 @@ def ads_generate_netlist(save: bool = True) -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_run_simulation(output_dir: str = "", backend: str = "standalone", session_id: int | None = None,
                        workspace: str = "", design: str = "", mode: str = "simulate", data_directory: str = "") -> dict[str, Any]:
@@ -431,7 +473,7 @@ def ads_run_simulation(output_dir: str = "", backend: str = "standalone", sessio
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_get_sim_status(task_id: str) -> dict[str, Any]:
     """Poll circuit or Momentum tasks. Momentum reports live frequency progress.
 
@@ -459,7 +501,7 @@ def ads_get_sim_status(task_id: str) -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_list_gui_sessions() -> dict[str, Any]:
     """Discover GUI sessions through the official bridge or the owned ADS 2025 registry.
 
@@ -488,7 +530,7 @@ def _model_operation(lib: str, operation: str, *, session_id: int | None = None,
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_create_substrate(lib: str, name: str,
                          dielectrics: list[DielectricLayer], conductors: list[ConductorLayer],
@@ -507,7 +549,7 @@ def ads_create_substrate(lib: str, name: str,
                              vias=vias or [])
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_create_layout(lib: str, cell: str,
                       shapes: list[LayoutShape], view: str = "layout") -> dict[str, Any]:
@@ -523,7 +565,7 @@ def ads_create_layout(lib: str, cell: str,
     return _model_operation(lib, "layout", cell=cell, view=view, shapes=shapes)
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_add_layout_ports(lib: str, cell: str,
                          ports: list[LayoutPort], view: str = "layout") -> dict[str, Any]:
@@ -537,7 +579,7 @@ def ads_add_layout_ports(lib: str, cell: str,
     return _model_operation(lib, "ports", cell=cell, view=view, ports=ports)
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_configure_momentum_setup(lib: str, cell: str,
                                   substrate: str, start_ghz: float, stop_ghz: float, points: int,
@@ -561,7 +603,7 @@ def ads_configure_momentum_setup(lib: str, cell: str,
                             impedance_ohms=50.0)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_inspect_momentum_setup(workspace: str, setup_file: str, setup: str = "emSetup") -> dict[str, Any]:
     """Inspect a saved native Momentum setup, its layout, paths and linear sweep.
 
@@ -576,7 +618,7 @@ def ads_inspect_momentum_setup(workspace: str, setup_file: str, setup: str = "em
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_run_momentum(session_id: int, workspace: str, setup_file: str, setup: str = "emSetup") -> dict[str, Any]:
     """Run an existing native Momentum setup in the selected ADS GUI session.
@@ -597,7 +639,7 @@ def ads_run_momentum(session_id: int, workspace: str, setup_file: str, setup: st
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_get_results(dataset: str = "", varblock: str = "") -> dict[str, Any]:
     """Read a simulation dataset (.ds): S-parameter summary and data preview."""
     try:
@@ -621,7 +663,7 @@ def _last_dataset_from_tasks() -> str:
     return ""
 
 
-@mcp.tool()
+@tools.tool()
 def ads_export_touchstone(dataset: str = "", out_path: str = "") -> dict[str, Any]:
     """Export the full 1/N-port matrix to a matching .sNp file (50-ohm reference)."""
     try:
@@ -641,7 +683,7 @@ def ads_export_touchstone(dataset: str = "", out_path: str = "") -> dict[str, An
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_plot_sparams(dataset: str = "", out_png: str = "", columns: list[str] | None = None) -> dict[str, Any]:
     """Plot |S| in dB vs frequency to a PNG (e.g. columns ["S[1,1]", "S[1,2]"])."""
     try:
@@ -654,7 +696,7 @@ def ads_plot_sparams(dataset: str = "", out_png: str = "", columns: list[str] | 
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_autolabel(max_pass: int = 4, step: float = 0.75) -> dict[str, Any]:
     """Auto-place instance labels to clear text-level collisions (KiCad-style).
 
@@ -668,7 +710,7 @@ def ads_autolabel(max_pass: int = 4, step: float = 0.75) -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 def ads_audit_schematic(lib: str = "", cell: str = "") -> dict[str, Any]:
     """Audit a schematic for overlapping elements (KiCad-style).
 
@@ -684,7 +726,7 @@ def ads_audit_schematic(lib: str = "", cell: str = "") -> dict[str, Any]:
         return _err(exc)
 
 
-@mcp.tool()
+@tools.tool()
 @_serialize_workspace
 def ads_open_in_gui(workspace: str = "") -> dict[str, Any]:
     """Open the current or explicitly specified saved workspace in ADS GUI.
@@ -708,17 +750,26 @@ def ads_open_in_gui(workspace: str = "") -> dict[str, Any]:
         return _err(exc)
 
 
-from native_tools import register as _register_native_tools
-_register_native_tools(mcp, engine, state)
+if PROFILE != "workflow":
+    from native_tools import register as _register_native_tools
+    _register_native_tools(tools, engine, state)
 
-from workflow_tools import register as _register_workflow_tools
-_register_workflow_tools(mcp, engine, state, _workspace_dispatch_lock)
+if PROFILE in ("rf", "full"):
+    from workflow_tools import register as _register_workflow_tools
+    _register_workflow_tools(tools, engine, state, _workspace_dispatch_lock)
+elif PROFILE in ("em", "workflow"):
+    from rf_review import register as _register_rf_review
+    _register_rf_review(tools, compact_default=PROFILE == "workflow")
+    if PROFILE == "workflow":
+        from rf_job_tools import register as _register_jobs
+        _register_jobs(tools)
 
-from schematic_flow import register as _register_schematic_flow
-_register_schematic_flow(mcp, engine, state, _workspace_dispatch_lock)
+if PROFILE != "workflow":
+    from schematic_flow import register as _register_schematic_flow
+    _register_schematic_flow(tools, engine, state, _workspace_dispatch_lock)
 
 from design_workflow import register as _register_design_workflow
-_register_design_workflow(mcp, engine, state, _workspace_dispatch_lock)
+_register_design_workflow(tools, engine, state, _workspace_dispatch_lock)
 
 if __name__ == "__main__":
     ensure_env()
@@ -726,12 +777,22 @@ if __name__ == "__main__":
     # first-initialized from a worker thread (silent native abort)
     from ads_engine import get_de
 
+    de_start = time.perf_counter()
     get_de()
+    de_ready = time.perf_counter()
     # ADS 2025's bundled SciPy BLAS extension can block on first import once
     # the stdio transport has reader threads. Load it on the main thread
     # before starting MCP, as with the native DE engine above.
-    import scipy.spatial
-
+    if PROFILE in ("full", "rf", "workflow"):
+        import scipy.spatial
+    if task_dir := os.environ.get("ADS_MCP_TASK_DIR"):
+        from schematic_flow import atomic_json
+        atomic_json(Path(task_dir) / f"startup-{os.getpid()}.json", {
+            "profile": PROFILE, "pid": os.getpid(),
+            "server_setup_seconds": de_start - _PROCESS_START,
+            "ads_initialization_seconds": de_ready - de_start,
+            "pre_transport_seconds": time.perf_counter() - de_ready,
+        })
     mcp.run()
     # the de engine leaves Qt threads behind; without a hard exit the process
     # would hang after stdin EOF and block every MCP client's shutdown

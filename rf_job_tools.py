@@ -6,6 +6,12 @@ from rf_jobs import JobStore
 
 
 def prepare_request(workflow, arguments):
+    if workflow=="hb_matching":
+        from pa_matching import prepare
+        return prepare(**arguments)
+    if workflow in ("topologies","parasitics"):
+        from matching_comparison import topology_plan, parasitic_plan
+        return (topology_plan if workflow=="topologies" else parasitic_plan)(**arguments)
     if workflow=="sp":
         from matching_sweep import prepare_sp_verification
         return prepare_sp_verification(**arguments)
@@ -28,7 +34,7 @@ def prepare_request(workflow, arguments):
 
 def register(mcp):
     @mcp.tool()
-    def ads_submit_rf_job(workflow:Literal["sp","optimize","hb","sweep","search","tolerance"], request_file:str)->dict:
+    def ads_submit_rf_job(workflow:Literal["sp","optimize","hb","sweep","search","tolerance","topologies","parasitics","hb_matching"], request_file:str)->dict:
         """Submit an immutable RF request JSON as a durable serial job. Survives client disconnect.
 
         Read RF-JOBS.zh-CN.md and examples/rf_jobs for contracts. JSON contains
@@ -50,15 +56,12 @@ def register(mcp):
     @mcp.tool()
     def ads_rf_job(action:Literal["status","wait","pause","resume","cancel","list","detail"], job_id:str="",
                    after_revision:int=-1, wait_seconds:int=20, offset:int=0, limit:int=10,
-                   fields:list[str]|None=None, failures_only:bool=False)->dict:
-        """Manage durable RF jobs without retransmitting full results.
-
-        wait returns on revision change, terminal state or <=25 seconds; a wait
-        timeout is not job failure. Pause finishes the current case then stops;
-        resume verifies/reuses saved cases; cancel stops only owned processes.
-        detail pages <=50 cases with selected fields or failures_only. Full
-        precision results and logs remain in output_dir. The workroot identifies
-        the shared queue; list retrieves its recent jobs across MCP sessions.
+                   fields:list[str]|None=None, failures_only:bool=False,
+                   wait_until:Literal["change","terminal"]|None=None)->dict:
+        """Wait up to 25 s on the same job. 'terminal' skips progress, also returns on pause;
+        'change' streams revisions. Workflow defaults to terminal, other profiles to change.
+        Timeout leaves the job running. Detail pages up to 50 cases; artifacts in output_dir.
+        Pause after current case, resume verified checkpoints, cancel only owned processes.
         """
         try:
             store=JobStore()
@@ -67,7 +70,7 @@ def register(mcp):
             if action=="status":
                 return store.status(job_id)
             if action=="wait":
-                return store.wait(job_id,after_revision,wait_seconds)
+                return store.wait(job_id,after_revision,wait_seconds,wait_until)
             if action=="detail":
                 return store.detail(job_id,offset,limit,fields,failures_only)
             return store.control_job(job_id,action)

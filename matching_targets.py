@@ -114,6 +114,7 @@ def build_regions(analysis_manifest, limits, output_dir="", mode="samples", max_
     out = fresh_output(output_dir, "loadpull_regions", [manifest_path, csv_path, *[d["source_path"] for d in manifest["datasets"]]])
     out.mkdir(parents=True, exist_ok=False)
     result = dict(schema="ads-mcp-loadpull-regions-v1", mode=mode, reference_plane=plane, conditions=contract,
+                  reference_ohms=float(frame["Z0_ohm"].iloc[0]), target_convention="presented_impedance",
                   conditions_source="caller; not independently verified", limits=limits.model_dump(),
                   source_manifest=str(manifest_path), source_manifest_sha256=manifest_hash,
                   source_csv=str(csv_path), source_csv_sha256=manifest["all_points_sha256"],
@@ -135,6 +136,8 @@ def load_regions(path, spec):
         raise ValueError("Unsupported region artifact")
     if data["reference_plane"].strip() != spec.reference_plane.strip():
         raise ValueError("Region and matching reference_plane must agree exactly; no automatic de-embedding")
+    if data.get("target_convention","presented_impedance") != "presented_impedance":
+        raise ValueError("Load-pull region has a different impedance convention")
     regions = data["frequency_regions"]
     fs = np.asarray([r["freq_hz"] for r in regions], float)
     if not len(fs) or not np.isfinite(fs).all() or (fs <= 0).any() or (np.diff(fs) <= 2).any():
@@ -231,6 +234,8 @@ def score_targets(f, zin, band, spec):
         tf = np.asarray([p.freq_hz for p in spec.target_table])
         tr = np.asarray([p.r_ohm for p in spec.target_table])
         tx = np.asarray([p.x_ohm for p in spec.target_table])
+        if spec.target_convention == "conjugate_of_device_impedance":
+            tx = -tx
         if spec.target_interpolation == "linear":
             # Clamp only the 1 Hz grid-matching tolerance; never extrapolate a target.
             query = f[band].clip(tf[0], tf[-1])
@@ -248,7 +253,9 @@ def score_targets(f, zin, band, spec):
         error[scored] = abs(zin[scored] - (target_r[scored] + 1j * target_x[scored]))
     else:
         target_r[band], target_x[band] = spec.target_r_ohm, spec.target_x_ohm
-        error[band] = abs(zin[band] - complex(spec.target_r_ohm, spec.target_x_ohm))
+        if spec.target_convention == "conjugate_of_device_impedance":
+            target_x[band] *= -1
+        error[band] = abs(zin[band] - (target_r[band] + 1j*target_x[band]))
         evidence[band] = "constant_target"
     if not scored.any() or not np.isfinite(error[scored]).all():
         raise ValueError("No finite scored target frequencies")

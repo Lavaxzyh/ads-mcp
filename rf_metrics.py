@@ -52,6 +52,7 @@ def evaluate_criteria(points, spec, scored, s22):
             objective = (abs(value-c.target) if c.objective == "target" else value if c.objective == "minimize" else -value) / c.scale
             objectives.append(objective)
         records.append(dict(name=c.name, metric=c.metric, aggregate=c.aggregate, value=value,
+                            minimum_at_hz=float(f[mask][np.argmin(data)]),maximum_at_hz=float(f[mask][np.argmax(data)]),
                             lower=c.lower, upper=c.upper, normalized_violation=v, passes=v <= 1e-10,
                             objective=objective, weight=c.weight, sampled_points=int(mask.sum()), band_hz=[lo, hi]))
     if spec.max_error_ohm is not None:

@@ -61,6 +61,22 @@ def cache_eligibility(text, data_directory):
     return ""
 
 
+def _installation_files(directory, relative):
+    # DirEntry reuses enumeration metadata on Windows. Walking sorted siblings
+    # preserves the old sorted(Path.rglob()) order and existing cache keys.
+    with os.scandir(directory) as entries:
+        children = sorted(entries, key=lambda entry: os.path.normcase(entry.name))
+    for entry in children:
+        if entry.name == "__pycache__":
+            continue
+        name = os.path.join(relative, entry.name)
+        if entry.is_dir(follow_symlinks=False):
+            yield from _installation_files(entry.path, name)
+        elif os.path.splitext(entry.name)[1] not in {".pyc", ".log"} and entry.is_file():
+            stat = entry.stat()
+            yield name, stat.st_size, stat.st_mtime_ns
+
+
 def solver_fingerprint():
     root = Path(os.environ["HPEESOF_DIR"])
     required = [root / "bin" / n for n in ("hpeesofsim.exe", "hpeesofsim_private.dll", "hpeesofsim.cfg")]
@@ -69,12 +85,10 @@ def solver_fingerprint():
     # (including a model/parser/DLL update) invalidate the cache. Hash the core
     # solver contents as well; large vendor trees need not be read in full.
     inventory = []
-    for directory in (root / "bin", root / "circuit", root / "custom", root / "tools" / "python"):
-        if directory.exists():
-            for path in sorted(directory.rglob("*")):
-                if path.is_file() and path.suffix not in {".pyc", ".log"} and "__pycache__" not in path.parts:
-                    stat = path.stat()
-                    inventory.append((str(path.relative_to(root)), stat.st_size, stat.st_mtime_ns))
+    for relative in ("bin", "circuit", "custom", os.path.join("tools", "python")):
+        directory = root / relative
+        if directory.is_dir():
+            inventory.extend(_installation_files(directory, relative))
     configs = Path(os.environ.get("HOME", str(Path.home()))) / "hpeesof" / "config"
     home_hashes = {str(p.relative_to(configs)): sha256(p) for p in sorted(configs.rglob("*")) if p.is_file() and p.suffix in {".cfg", ".defs"}}
     payload = dict(core={str(p): sha256(p) for p in required}, install_inventory=inventory, home_config=home_hashes)
