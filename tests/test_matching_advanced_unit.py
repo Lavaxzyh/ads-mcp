@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from matching_advanced import (SearchParameter, SearchSettings, ToleranceParameter, ToleranceSettings,
                                axis, bounded_product, prepare_advanced, run_search, run_tolerance, tolerance_design)
-from matching_runs import SimulationCache, cache_eligibility
+from matching_runs import SimulationCache, cache_eligibility, _installation_files
 from matching_sweep import NetlistEditor, evaluate_frame
 from matching_targets import build_regions, load_regions, region_distance
 from rf_workflows import MatchingEvaluation, SweepParameter, sha256, write_json
@@ -30,6 +30,23 @@ def table_spec(interpolation="exact"):
 
 
 class AdvancedTests(unittest.TestCase):
+    def test_installation_inventory_matches_legacy_order_and_observes_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for key in ("b", "a/z", "a/b", "a.txt", "skip.pyc", "x.log", ".settings",
+                        "sub/__pycache__/skip", "unicode/元件"):
+                path = root/"bin"/key
+                path.parent.mkdir(exist_ok=True, parents=True)
+                path.write_bytes(b"data")
+            def inventory():
+                return list(_installation_files(root/"bin", "bin"))
+            old = [(str(p.relative_to(root)), p.stat().st_size, p.stat().st_mtime_ns)
+                   for p in sorted((root/"bin").rglob("*")) if p.is_file()
+                   and p.suffix not in {".pyc", ".log"} and "__pycache__" not in p.parts]
+            self.assertEqual(old, inventory())
+            (root/"bin/a/b").write_bytes(b"changed")
+            self.assertNotEqual(old, inventory())
+
     def test_frequency_table_exact_and_explicit_linear(self):
         points, result = evaluate_frame(through(), table_spec())
         self.assertEqual(result["evaluated_points"], 2)

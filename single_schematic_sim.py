@@ -35,6 +35,15 @@ def simulation_context(request,state):
 
 
 def submit(request,state,root,folder):
+    from schematic_connections import binding, check
+    intended = binding(root,state)
+    if intended is not None:
+        from single_schematic import snapshot
+        result = check(snapshot(state), intended)
+        report = folder/'connection-check.json'
+        atomic_json(report, result)
+        if not result['ok']:
+            raise ValueError(f"Connection check failed before SP: {result['issues'][0]}; see {report}")
     req,snap,frozen,key,reason=simulation_context(request,state)
     cached=state.get('simulation_cache',{}).get(key) if not reason else None
     if cached:
@@ -72,7 +81,7 @@ def submit(request,state,root,folder):
         'cache_policy':job['cache_policy'],'next_action':'run operation=status; do not resubmit'}
 
 
-def poll(state,root,after_revision=-1,wait_seconds=0):
+def poll(state,root,after_revision=-1,wait_seconds=0,wait_until=None):
     from single_schematic import summary,snapshot
     job=state['simulation'];record=Path(job['evidence'])
     if job.get('finalized'):
@@ -85,7 +94,7 @@ def poll(state,root,after_revision=-1,wait_seconds=0):
             found=db.execute('SELECT id FROM jobs WHERE output_dir=?',(job['output_dir'],)).fetchall()
         if len(found)!=1:raise RuntimeError('SUBMISSION_UNRESOLVED: no unique original job; inspect persisted receipt, do not resubmit')
         job['job_id']=found[0]['id'];atomic_json(root/'task.json',state)
-    status=store.wait(job['job_id'],after_revision,wait_seconds)
+    status=store.wait(job['job_id'],after_revision,wait_seconds,wait_until)
     if status['status'] in ('queued','running','paused'):
         return summary(state,'status',root/'task.json',status=status['status'],job_id=job['job_id'],
             job_revision=status['revision'],changed=status['revision']!=after_revision)

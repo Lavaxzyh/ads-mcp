@@ -1,5 +1,7 @@
 # 一次一个原理图：现有功能的精简工作流
 
+开发分支的双副本分工、合并、备份恢复和连接检查见[功放与匹配工作流](PA-WORKFLOWS.zh-CN.md)。
+
 本地发布 `0.4.0+ads2025.20261030.3`，上游仍为 v0.4.0，运行于本机 ADS 2025。此版本优化现有建图、修改、检查和线性 SP 的组织方式，没有新增 HB、PDK、多端口或新的射频设计能力。
 
 ## 默认使用方式
@@ -16,6 +18,32 @@
 一个任务目录只有一个 `workspace/library/cell/schematic` 身份。新建时绑定；已有工程通过 `import` 复制一次。后续 `edit` 修改同一独立原理图，不再每改一个参数就增加工作区。多个原理图应拆成有顺序的任务。完成任务后退出本任务专用客户端，避免长期占用内存；本流程不打开 GUI 窗口。
 
 优先使用现有 `ads_design_workflow(action="run", task_directory="绝对路径", request_file="绝对路径")`。原有 build/export/plan_patch/apply_patch 等入口保留兼容；需要保留多个完整候选工程时才明确选择原复制工作流。EM 原生接口继续按 EM-WORKFLOW.zh-CN.md 使用，本入口不把任意 EM/GUI 工程自动纳入快速 SP 构建器。
+
+## 选择工具配置
+
+专用客户端 `design_workflow_client.py` 默认使用 `workflow`。这组 7 个工具覆盖单原理图、参数选择、工作区诊断、自检、RF 作业提交与管理、已有 RF 数据分析。在同一张图上连续修改时复用一个 `--interactive` 或 `--batch` 进程。原始 stdio 服务默认仍加载 `full`。在 MCP 客户端的服务进程环境中设置 `ADS_MCP_PROFILE=workflow` 可启用同一组工具。
+
+需要直接调用底层读图接口时选择 `schematic`，直接调用 Load-pull、匹配或容差工具时选择 `rf`，版图和 Momentum 选择 `em`。专用客户端的 `--profile` 优先于环境变量。用 `tools/list` 查看实际工具，用 `ads_runtime_selfcheck(detail="full")` 查看完整诊断。
+
+已设置 `ADS_MCP_TASK_DIR` 的独立服务会话可省略工具参数 `task_directory`。其他会话传入绝对路径。`action="run"` 接受 `request_file` 或内联 `request`，两者选一。大型工程输入可继续走文件。等待已提交的仿真时，交互客户端或批处理中的一条命令可以这样写：
+
+```json
+{"action":"run","request":{"operation":"status","wait_seconds":20,"wait_until":"terminal"}}
+```
+
+该调用在完成、失败、暂停或等待到期时返回。同一作业仍在运行时可继续等待，每次最多 25 秒。`wait_until="change"` 返回下一次进度变化。`workflow` 的有界等待默认使用 `terminal`，其他配置沿用 `change`。
+
+## 从已保存的原理图选取修改项
+
+1. 完成 `import` 或 `build` 后，以任务目录的绝对路径调用 `ads_prepare_schematic_edit(task_directory=…)`。返回值列出实例、字段名、当前值和显式单位。表达式或无显式单位的值保留原文。
+2. 例如，传入同一目录以及 `instance="R1", field="parameters", key="R", value="100 Ohm"`。变量使用 `field="variables"`。先核对返回的 `preview`，其中包含修改前后的值。
+3. 将返回的 `next_call` 作为参数传给 `ads_design_workflow` 执行修改。请求绑定原理图修订号；如果修订已变化，重新读取当前字段再生成请求。此入口支持标量普通参数和 VAR 变量。端口阻抗、编号与扫频范围等联动修改使用带 `contract_after` 的请求。
+
+## 查看耗时与首个错误
+
+调用 `ads_design_workflow(action="timing", task_directory=…)`，在 `task_breakdown` 查看读图、修改、排队、SP 求解、原理图导出和结果导出的耗时，以及实际发起的 SP 求解次数和缓存命中次数。专用客户端记录进程启动至握手的耗时，任务专用服务端另存工具准备与 ADS 初始化耗时。多个会话的耗时按任务累计。未观测到的时间显示为 `null`，各阶段可能重叠。
+
+调用 `ads_diagnose_workspace(workspace=…, netlist_path=…, data_directory=…, solver_log=…)` 检查工作副本。后三个参数按需提供。返回值 `first_error` 给出第一个发现的问题及下一步检查；`issues` 保留其他问题。本地嵌套库定义会继续检查，外部库记录位置。模型与数据检查覆盖网表中的显式文件引用。
 
 ## 简短请求文件
 

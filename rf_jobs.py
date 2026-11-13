@@ -161,16 +161,22 @@ class JobStore:
                 answer["result"] = brief
         return answer
 
-    def wait(self, job_id, after_revision=-1, timeout_seconds=20):
+    def wait(self, job_id, after_revision=-1, timeout_seconds=20, wait_until=None):
         if not 0 <= timeout_seconds <= 25:
             raise ValueError("wait_seconds must be 0..25")
+        if wait_until is None:
+            wait_until = "terminal" if os.environ.get("ADS_MCP_PROFILE") == "workflow" else "change"
+        if wait_until not in {"change", "terminal"}:
+            raise ValueError("wait_until must be change or terminal")
         self.ensure_dispatch()
         end = time.monotonic()+timeout_seconds
         while True:
             row = self.row(job_id)
-            if row["revision"] > after_revision or row["status"] in TERMINAL|{"paused"} or time.monotonic() >= end:
+            remaining = end - time.monotonic()
+            changed = wait_until == "change" and row["revision"] > after_revision
+            if changed or row["status"] in TERMINAL|{"paused"} or remaining <= 0:
                 return self.status(job_id)
-            time.sleep(0.15)
+            time.sleep(min(0.15, remaining))
 
     def control_job(self, job_id, action):
         self.ensure_dispatch()

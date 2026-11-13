@@ -98,6 +98,8 @@ class MatchingEvaluation(StrictModel):
     region_file: str = ""
     input_port: Literal[1, 2]
     reference_plane: str = Field(min_length=1)
+    target_convention: Literal["presented_impedance", "conjugate_of_device_impedance"] = "presented_impedance"
+    observation_direction: Literal["into_network_from_selected_port"] = "into_network_from_selected_port"
     max_error_ohm: FiniteFloat | None = Field(default=None, ge=0)
     source_r_ohm: FiniteFloat | None = Field(default=None, gt=0)
     source_x_ohm: FiniteFloat | None = None
@@ -116,6 +118,8 @@ class MatchingEvaluation(StrictModel):
         constant = self.target_r_ohm is not None or self.target_x_ohm is not None
         if sum((constant, bool(self.target_table), bool(self.region_file))) != 1:
             raise ValueError("Choose exactly one constant target, target_table, or region_file")
+        if self.region_file and self.target_convention != "presented_impedance":
+            raise ValueError("Load-pull regions already describe a presented load; use their coordinates directly")
         if constant and (self.target_r_ohm is None or self.target_x_ohm is None):
             raise ValueError("Constant target needs both target_r_ohm and target_x_ohm")
         if self.target_table:
@@ -127,6 +131,12 @@ class MatchingEvaluation(StrictModel):
         elif self.target_interpolation != "exact":
             raise ValueError("Frequency interpolation is available only for target_table, not load-pull regions")
         return self
+
+    def impedance_contract(self):
+        return dict(port=self.input_port, reference_plane=self.reference_plane,
+                    observation_direction=self.observation_direction, reference_ohms=self.reference_ohms,
+                    termination=dict(port=3-self.input_port, r_ohm=self.load_r_ohm, x_ohm=self.load_x_ohm),
+                    target_convention=self.target_convention)
 
 
 def sha256(path):

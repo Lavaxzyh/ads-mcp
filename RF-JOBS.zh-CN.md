@@ -8,7 +8,7 @@
 
 1. 将工作流参数写入一个本地 UTF-8 JSON 文件。`examples/rf_jobs/` 提供输入示例。
 2. 调用 `ads_submit_rf_job(workflow="optimize", request_file="<TASK_ROOT>/request.json")`。`workflow` 可选 `optimize`、`hb`、`search`、`sweep`、`tolerance`。
-3. 保存返回的 `job_id`。调用 `ads_rf_job(action="wait", job_id="rf_...", after_revision=<上次 revision>, wait_seconds=20)`。一次等待最多 25 秒，超时只结束观察，不能因此重复提交。
+3. 保存返回的 `job_id`。用 `ads_rf_job(action="wait", job_id="rf_...", wait_until="terminal", wait_seconds=20)` 等待完成、暂停、失败或取消。一次最多等 25 秒，仍在运行时继续等待相同的 `job_id`。需要显示逐步进度时用 `wait_until="change"` 并传上次的 `after_revision`。
 4. 完成后默认只返回简要结论和输出路径。用 `ads_rf_job(action="detail", job_id="rf_...", limit=5, failures_only=true)` 读取失败或不合格案例。`fields` 可选择 `case,status,parameters,error,feasible,constraint_violation,criteria,max_error_ohm,rms_error_ohm,objective_score,objective_vector,cache_hit,resumed,pout_dbm,pae_pct,gain_db,convergence,harmonics,conditions,directory,dataset,points_csv`。
 5. 全量精度与日志保存在 `summary.json`、`cases.json`、各 `case_XXXX` 子目录及 `checkpoints`，不必在每次对话中传回全部数据。
 

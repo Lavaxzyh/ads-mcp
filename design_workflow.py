@@ -19,24 +19,41 @@ def implementation_hash():
     return digest(b''.join(p.read_bytes() for p in sorted(root.glob('*.py'))))
 
 
-def dispatch(action, request_file, directory, engine):
+def dispatch(action, request_file, directory, engine, request=None):
     root = Path(directory).resolve()
     assigned = os.environ.get('ADS_MCP_TASK_DIR')
     if assigned and Path(assigned).resolve() != root:
         raise ValueError('This private session belongs to another task directory')
+    if request is not None and (request_file or action != 'run'):
+        raise ValueError("Inline request is only supported for action=run, with no request_file")
     trace = Trace(root)
     if action == 'templates': return {'ok':True,'templates':catalog()}
     if action == 'timing': return {'ok':True,**trace.summary()}
     with trace.span('materials','read workflow request'):
-        source=Path(request_file).resolve(strict=True)
-        if source.stat().st_size>512000: raise ValueError('Request exceeds 512 KB')
-        raw=source.read_bytes(); request=json.loads(raw.decode('utf-8-sig'))
+        if request is None:
+            if not request_file: raise ValueError('Supply a request_file or an inline run request')
+            source=Path(request_file).resolve(strict=True)
+            if source.stat().st_size>512000: raise ValueError('Request exceeds 512 KB')
+            raw=source.read_bytes()
+            request=json.loads(raw.decode('utf-8-sig'))
+        else:
+            raw=json.dumps(request,ensure_ascii=False,sort_keys=True,separators=(',',':'),allow_nan=False).encode('utf-8')
+            if len(raw)>512000: raise ValueError('Request exceeds 512 KB')
     request_hash=digest(action.encode()+raw); build_hash=implementation_hash()
     trace.check_retry(request_hash,build_hash)
     try:
         if action == 'run':
             from single_schematic import run
             return run(request,root,engine)
+        if action in ('fork_matching','plan_merge'):
+            from schematic_merge import fork, preview
+            return (fork if action=='fork_matching' else preview)(request,root,engine)
+        if action in ('plan_restore','restore'):
+            from schematic_backup import preview, apply
+            return preview(request,root) if action=='plan_restore' else apply(request,root,engine)
+        if action=='check_connections':
+            from schematic_connections import inspect
+            return inspect(request,root)
         if action in ('expand','validate','build'):
             from schematic_flow import execute
             with trace.span('configuration','expand template and check engineering contract'):
@@ -80,22 +97,20 @@ def dispatch(action, request_file, directory, engine):
 
 def register(mcp,engine,state,dispatch_lock):
     @mcp.tool()
-    def ads_design_workflow(action: Literal['run','templates','expand','validate','build','timing','export','plan_patch','apply_patch','capabilities','plan_candidate','materialize','simulate','compare'],
-                            task_directory: str, request_file: str='') -> dict:
-        """Use a verified recipe and explicit conditions in a private task session.
-
-        Prefer action=run for one bound schematic, edits and compact receipts;
-        read SINGLE-SCHEMATIC.zh-CN.md. Existing actions remain compatible.
-        Legacy build never simulates; run requires explicit SP authorization. Long-lived
-        isolated CLI supports consecutive commands without restarting ADS. Each
-        operation is bounded; no retries or automatic adapter development.
+    def ads_design_workflow(action: Literal['run','templates','expand','validate','build','timing','export','plan_patch','apply_patch','capabilities','plan_candidate','materialize','simulate','compare','fork_matching','plan_merge','plan_restore','restore','check_connections'],
+                            task_directory: str='', request_file: str='', request: dict | None=None) -> dict:
+        """Operate on one independent schematic. Use a request_file, or pass a small run request inline.
+        A private session supplies its task_directory. For pending SP use run with
+        {"operation":"status","wait_seconds":20,"wait_until":"terminal"}. Simulation requires authorization.
+        Read SINGLE-SCHEMATIC.zh-CN.md for edits, expected_revision and stable request IDs.
         """
+        task_directory = task_directory or os.environ.get('ADS_MCP_TASK_DIR','')
         try:
             if not Path(task_directory).is_absolute(): raise ValueError('task_directory must be absolute')
             with dispatch_lock:
                 if any(t['status']=='running' for t in state.snapshot()['tasks'].values()):
                     raise RuntimeError('Session has another running operation; use the private client')
-                return dispatch(action,request_file,task_directory,engine)
+                return dispatch(action,request_file,task_directory,engine,request)
         except Exception as exc:
             error=f'{type(exc).__name__}: {exc}'
             detail={}

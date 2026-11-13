@@ -23,7 +23,7 @@ from schematic_flow import target_lock
 from workflow_trace import Trace
 
 
-async def run(task_directory, ads_root, batch=None, interactive=False):
+async def run(task_directory, ads_root, batch=None, interactive=False, profile=None):
     root = Path(task_directory).resolve()
     trace = Trace(root)
     if not (Path(ads_root)/'bin/hpeesofsim.exe').is_file():
@@ -43,6 +43,7 @@ async def run(task_directory, ads_root, batch=None, interactive=False):
                    ADS_MCP_TASK_DIR=str(root), ADS_MCP_STATE_FILE=str(root/'session-state.json'),
                    ADS_MCP_WORKROOT=str(root/'rf-jobs'), MPLCONFIGDIR=str(root/'mplconfig'),
                    PYTHONUTF8='1', PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1')
+        env["ADS_MCP_PROFILE"] = profile or os.environ.get("ADS_MCP_PROFILE", "workflow")
         total = time.perf_counter()
         started = trace.begin('service_startup', 'native initialization and MCP handshake')
         with (root/'server.log').open('a', encoding='utf-8') as errors:
@@ -62,9 +63,9 @@ async def run(task_directory, ads_root, batch=None, interactive=False):
                         command = commands[index]; index += 1
                     else: break
                     if command.get('action') == 'quit': break
-                    if set(command)-{'action','request_file'}:
-                        raise ValueError('Commands contain only action and request_file')
-                    args = dict(command, task_directory=str(root))
+                    if set(command)-{'action','request_file','request'}:
+                        raise ValueError('Commands contain only action, request_file or an inline run request')
+                    args = command
                     t = time.perf_counter()
                     try:
                         response = await asyncio.wait_for(session.call_tool('ads_design_workflow',args), timeout=300)
@@ -95,10 +96,12 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--task-dir', required=True)
     p.add_argument('--ads-root', default=str(get_ads_install_dir()))
+    from tool_profiles import PROFILES
+    p.add_argument('--profile', choices=PROFILES, help='Tool catalog (default: ADS_MCP_PROFILE or workflow)')
     group = p.add_mutually_exclusive_group(required=True)
     group.add_argument('--batch'); group.add_argument('--interactive', action='store_true')
     a=p.parse_args()
-    return asyncio.run(run(a.task_dir,a.ads_root,a.batch,a.interactive))
+    return asyncio.run(run(a.task_dir,a.ads_root,a.batch,a.interactive,a.profile))
 
 
 if __name__ == '__main__':

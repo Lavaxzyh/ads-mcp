@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import sys
+import time
 import numpy as np
 
 from ads_engine import ensure_env
@@ -23,9 +24,19 @@ def process_request(request_file):
         from keysight.edatoolbox.ads import CircuitSimulator
         from keysight.ads import dataset
         options = {"rel_data_dir": request["data_directory"]} if request["data_directory"] else {}
-        CircuitSimulator().run_netlist((case / "input.net").read_text(encoding="utf-8"), output_dir=str(case), working_dir=str(case),
+        simulator = CircuitSimulator()
+        netlist = (case/"input.net").read_text(encoding="utf-8")
+        timing = {"native_attempts": 1, "solve_seconds": None, "export_seconds": None}
+        write_json(case/"sp-timing.json", timing)
+        started = time.perf_counter()
+        try:
+            simulator.run_netlist(netlist, output_dir=str(case), working_dir=str(case),
                                       output_file=str(case / "simulator.log"), netlist_file=str(case / "simulator.ckt"),
                                       dataset_name="matching_case", **options)
+        finally:
+            timing["solve_seconds"] = time.perf_counter() - started
+            write_json(case/"sp-timing.json", timing)
+        started = time.perf_counter()
         files = list(case.glob("*.ds"))
         if len(files) != 1:
             raise ValueError(f"Expected one fresh dataset, got {len(files)}")
@@ -40,11 +51,18 @@ def process_request(request_file):
         np.savez_compressed(case / "sparameters.npz", freq_hz=f, s=s)
         points.to_csv(case / "points.csv", index=False, encoding="utf-8-sig")
         touchstone = export_touchstone(frame, case / "result.s2p", reference_ohms=request["evaluation"]["reference_ohms"])
+        timing["export_seconds"] = time.perf_counter() - started
+        write_json(case/"sp-timing.json", timing)
         write_json(case / "result.json", dict(ok=True, dataset=str(files[0]), points_csv=str(case / "points.csv"),
                                               touchstone=touchstone["touchstone"], raw_sparameters=str(case / "sparameters.npz"), **metrics))
         return 0
     except Exception as exc:
-        write_json(case / "result.json", dict(ok=False, error=f"{type(exc).__name__}: {exc}"))
+        from workspace_diagnostics import first_solver_error
+        issue = first_solver_error(case/"simulator.log")
+        error = f"{type(exc).__name__}: {exc}"
+        if issue:
+            error = f"{issue['source']}:{issue['line']}: {issue['message']} {issue['detail']}. {issue['next_check']}"
+        write_json(case / "result.json", dict(ok=False, error=error, first_solver_error=issue))
         return 1
 
 
@@ -69,7 +87,8 @@ def main():
             request = json.loads(command.read_text(encoding="utf-8"))
             command.unlink()
             process_request(request["request_file"])
-            write_json(folder / "done.json", dict(sequence=request["sequence"]))
+            if "sequence" in request:  # Already-running coordinator from the previous protocol.
+                write_json(folder / "done.json", dict(sequence=request["sequence"]))
         else:
             time.sleep(0.03)
 

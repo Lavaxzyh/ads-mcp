@@ -190,7 +190,7 @@ def evaluate_frame(frame, evaluation):
         points[name] = value
     multi = evaluate_criteria(points, spec, scored, s[:, 1, 1])
     maximum = float(error[scored].max())
-    return points, dict(max_error_ohm=maximum, rms_error_ohm=float(np.sqrt(np.mean(error[scored] ** 2))),
+    return points, dict(impedance_contract=spec.impedance_contract(), max_error_ohm=maximum, rms_error_ohm=float(np.sqrt(np.mean(error[scored] ** 2))),
                         worst_s11_db_matched_reference=float(s11_db[scored].max()),
                         min_s21_db_matched_reference=float(s21_db[scored].min()),
                         evaluated_points=int(scored.sum()), total_frequency_points=len(f), **extra_metrics, **multi,

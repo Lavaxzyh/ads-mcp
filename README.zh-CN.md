@@ -2,9 +2,9 @@
 
 [English](README.md) · [原作者项目](https://github.com/Lavaxzyh/ads-mcp) · [MIT 许可](LICENSE)
 
-这是基于 **Lavaxzyh/ads-mcp v0.4.0** 的 **ADS 2025 适配与射频功放工作流增强分支**，维护目标为 **`feature/power-amplifier`**。继承原作者的原理图、原生 Layout、Momentum、emModel 和联合仿真基础，保留上游 **49 个工具名称**，当前实际注册 **64 个工具**。
+这是基于 **Lavaxzyh/ads-mcp v0.4.0** 的 **ADS 2025 适配与射频功放工作流增强分支**，维护在 **`feature/power-amplifier`**。默认 `full` 服务注册 **67 个工具**，包含上游全部 **49 个工具名称**。单原理图专用客户端默认使用包含 7 个工具的 `workflow` 配置，支持改图、仿真和 RF 结果分析。
 
-分支版本：**`0.4.0+ads2025.20261030.3`**，标识 `ads2025-share-20261030.3`。它不是原作者主线的新版本。实现基于上游 `72e2793`，此次提交基线为 `0181a5b`；后者只追加了 README 徽章修正。
+本轮基于上游合并 [PR #1](https://github.com/Lavaxzyh/ads-mcp/pull/1) 的提交 `18e1ed4`。分支版本为 `0.4.0+ads2025.20261030.3`，可通过 `ads_runtime_selfcheck` 返回的 `build_id` 核对实际运行的代码。
 
 本分支先独立维护 ADS 2025 兼容处理和功放相关工作流，后续与作者协作整合。重点是可靠执行已有设计、分析和验证步骤，不能替代工程判断，也不是 Keysight 官方产品。
 
@@ -31,13 +31,11 @@
 以下占位符须替换为自己的绝对路径，运行输出放在仓库之外。
 
 ```powershell
-git clone --branch feature/power-amplifier https://github.com/Lavaxzyh/ads-mcp.git
+git clone --branch feature/power-amplifier https://github.com/armkeny-byte/ads-mcp.git
 cd ads-mcp
 & '<ADS_INSTALL>/tools/python/python.exe' -m venv --system-site-packages .venv
 & '.venv/Scripts/python.exe' -m pip install -r requirements.txt
 ```
-
-在作者合并本次贡献之前，应使用贡献者 Fork 地址或已审核源码包，不能假定上游分支已经包含这些代码。
 
 ```json
 {
@@ -79,7 +77,7 @@ cd ads-mcp
 
 ## 验证与文档
 
-本次分享副本通过 **201 项单元检查**，并用**独立合成原理图完成真实 ADS 2025 建图、修改和保存重开**。历史 SP/EM 验证与本次发布检查分开记录；上游公开示例保留出处，没有宣称全部在本分支重测。
+本次更新通过 **237 项单元测试**和 **5 项 ADS 2025 原生回归**，覆盖工程写保护、引脚连接、两端口复数 S 参数、匹配网络改值与保存、单音 HB。
 
 ```powershell
 & '.venv/Scripts/python.exe' -B tools/run_unit_tests.py
@@ -93,11 +91,12 @@ cd ads-mcp
 | Load-pull 与基础扫描 | [RF-WORKFLOWS.zh-CN.md](RF-WORKFLOWS.zh-CN.md) |
 | 频变目标、搜索与容差 | [RF-ADVANCED.zh-CN.md](RF-ADVANCED.zh-CN.md) |
 | RF 队列与已有 HB 复核 | [RF-JOBS.zh-CN.md](RF-JOBS.zh-CN.md) |
+| 输入与输出匹配分工、原理图合并、功放和 EM 复核 | [PA-WORKFLOWS.zh-CN.md](PA-WORKFLOWS.zh-CN.md) |
 | 原生 EM 与专用 GUI | [EM-WORKFLOW.zh-CN.md](EM-WORKFLOW.zh-CN.md) |
 | 真实验证范围、耗时与限制 | [docs/VALIDATION.zh-CN.md](docs/VALIDATION.zh-CN.md) |
 | 隐私与运行数据 | [docs/PRIVACY.zh-CN.md](docs/PRIVACY.zh-CN.md) |
 
-前一效率版本中，准备好输入后的“建图＋两次修改＋错误拦截”，复用会话中位数为 8.12 秒，基线为 9.52 秒（各 n=3）；调用 7→4 次，返回文本 5,525→2,158 UTF-8 字节。冷启动没有改善。**这不是完整射频设计耗时，也不是实际 token 节省比例。** 公开合成示例已更换电气参数，不把它冒充原性能测试输入。
+在三频点串联电阻台架上，从启动、改值、求解到再次命中缓存，原开发版中位耗时为 18.12 秒（5 次），新版完整配置为 9.22 秒（3 次），日常配置为 9.78 秒（5 次）。工具目录按 `o200k_base` 离线计数，分别为 16,899、13,946 和 1,125 token。平台计费量未测。[测试条件与范围](docs/VALIDATION.zh-CN.md)
 
 ## 隐私、贡献与致谢
 

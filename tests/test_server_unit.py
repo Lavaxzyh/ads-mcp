@@ -128,6 +128,21 @@ class ServerTests(unittest.TestCase):
 
 
 class SchemaTests(unittest.IsolatedAsyncioTestCase):
+    def test_catalog_keeps_named_titles_constraints_and_example_data(self):
+        from tool_profiles import omit_repeated_titles
+        schema = {"properties": {
+            "gain_db": {"title":"Gain Db", "minimum":0},
+            "freq": {"title":"Port frequency (Hz)", "description":"Measured at port 1"},
+            "data": {"default":{"title":"User data"}, "examples":[{"title":"Example data"}]},
+        }, "required":["gain_db"], "additionalProperties":False}
+        omit_repeated_titles(schema)
+        self.assertEqual(schema["properties"]["gain_db"], {"minimum":0})
+        self.assertEqual(schema["properties"]["freq"]["title"], "Port frequency (Hz)")
+        self.assertEqual(schema["properties"]["data"]["default"]["title"], "User data")
+        self.assertEqual(schema["properties"]["data"]["examples"][0]["title"], "Example data")
+        self.assertEqual(schema["required"], ["gain_db"])
+        self.assertFalse(schema["additionalProperties"])
+
     async def test_32_tools_and_momentum_signature(self):
         tools = await server.mcp.list_tools()
         names = {tool.name for tool in tools}

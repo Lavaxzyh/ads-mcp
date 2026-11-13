@@ -9,6 +9,8 @@ from matching_advanced import SearchParameter, SearchSettings, ToleranceParamete
 
 
 def register(mcp, engine, state, dispatch_lock):
+    from rf_review import register as register_review
+    register_review(mcp)
     from rf_job_tools import register as register_jobs
     register_jobs(mcp)
     def launch(kind, prepare, run):
@@ -126,10 +128,11 @@ def register(mcp, engine, state, dispatch_lock):
         model+parameter supports substrate Er/H; instance+parameter supports
         line dimensions and components. Optional physical bounds reject invalid
         intervals; never silently clamp physical variations to nominal grids.
-        Monte Carlo assumes independent parameters: uniform ±tolerance, or
+        A named correlation_group shares one signed factor across its parameters.
+        Independent factors use uniform ±tolerance, or
         truncated_normal with sigma=tolerance/3 conditioned on ±tolerance.
         Full corners must fit the budget. Every invocation includes nominal and
-        2*N OAT cases. Sensitivity ranks max |Zperturbed-Znominal|, avoiding a
+        two OAT cases per independent factor. Sensitivity ranks max |Zperturbed-Znominal|, avoiding a
         misleading zero derivative at an optimum. Pass fractions include failed
         and unrun requested trials in the denominator; no threshold means no
         pass-fraction claim. This is SP robustness under assumed tolerances,

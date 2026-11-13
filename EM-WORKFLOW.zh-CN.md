@@ -1,5 +1,7 @@
 # ADS 2025 原生 EM 工作流
 
+开发分支的电路和 Momentum 复数 S 参数对照见[功放与匹配工作流](PA-WORKFLOWS.zh-CN.md)。
+
 本文原生 EM 证据来自历史版本 `0.4.0+ads2025.20261030.1`，批次 `ads2025-em-20261030.1`。当前分享版本及本次重测范围见 [验证摘要](docs/VALIDATION.zh-CN.md)，本次没有重跑整套 EM/GUI 矩阵。
 上游：Lavaxzyh/ads-mcp v0.4.0，commit `72e2793e0ebe8022903608e84cdb900f17ae81c0`。本地扩展不是上游新版本。
 本机实测：Keysight ADS 2025，610.shp Aug 20 2024，ADS Python 3.12.2，PySide2 5.15.10。
