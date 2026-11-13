@@ -82,14 +82,16 @@ def plot(days: list[dict], out: Path, *, offset: int = 0, updated_at: str | None
     known = [(date, value) for date, value in zip(dates, values) if value is not None]
     ax.bar([date for date, _ in known], [value for _, value in known], width=0.62,
            color="#93C5FD", edgecolor="#3B82F6", linewidth=0.8, label="daily clones", zorder=3)
-    ax.plot(dates, cumulative, color="#1D4ED8", marker="o", markersize=4.5,
-            linewidth=2.2, label="cumulative clones (all saved history)", zorder=4)
+    cumulative_line, = ax.plot(dates, cumulative, color="#1D4ED8", marker="o", markersize=4.5,
+                              linewidth=2.2, label="cumulative clones (all saved history)", zorder=4)
     indices = [i for i, value in enumerate(values) if value is not None]
     stride = max(1, len(indices) // 18)
+    annotations = []
     for position, i in enumerate(indices):
         if position % stride == 0 or i == indices[-1]:
-            ax.annotate(str(cumulative[i]), (dates[i], cumulative[i]), textcoords="offset points",
-                        xytext=(0, 8), ha="center", fontsize=8.5, color="#1D4ED8", zorder=5)
+            annotations.append(ax.annotate(
+                str(cumulative[i]), (dates[i], cumulative[i]), textcoords="offset points",
+                xytext=(0, 8), ha="center", fontsize=8.5, color="#1D4ED8", zorder=5))
     pending = [date for date, value in zip(dates, values) if value is None]
     for i, date in enumerate(pending):
         x = mdates.date2num(date)
@@ -123,6 +125,16 @@ def plot(days: list[dict], out: Path, *, offset: int = 0, updated_at: str | None
     fig.text(0.5, 0.018, scope, ha="center", fontsize=8, color="#64748B")
     fig.autofmt_xdate(rotation=0)
     fig.tight_layout(rect=(0, 0.09, 1, 1))
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    curve = cumulative_line.get_path().transformed(cumulative_line.get_transform())
+    for annotation in annotations:
+        if curve.intersects_bbox(annotation.get_window_extent(renderer).padded(2), filled=False):
+            annotation.set_position((0, -8))
+            annotation.set_verticalalignment("top")
+            if annotation.get_window_extent(renderer).y0 < ax.bbox.y0 + 2:
+                annotation.set_position((0, 8))
+                annotation.set_verticalalignment("baseline")
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, facecolor="white")
     plt.close(fig)

@@ -1,6 +1,6 @@
 # ads-mcp
 
-![Clones](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones.json) ![Views](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/views.json) ![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/installs.json)
+![Clones](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FLavaxzyh%2Fec682cff6f482626fa5348189838e66b%2Fraw%2Fclones.json%3Frefresh%3D20261113T145631Z) ![Views](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FLavaxzyh%2Fec682cff6f482626fa5348189838e66b%2Fraw%2Fviews.json%3Frefresh%3D20261113T145631Z) ![Installs](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FLavaxzyh%2Fec682cff6f482626fa5348189838e66b%2Fraw%2Finstalls.json%3Frefresh%3D20261113T145631Z)
 
 **ads-mcp v0.4.0** 提供 49 个 Keysight ADS MCP 工具，核心流程是 **原理图 → 原生 Layout → Momentum → 原生 emModel → 电路联合仿真**。
 
@@ -256,7 +256,9 @@ ADS 原生验证结果：
 
 ## 仓库统计与贡献
 
-![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png)
+![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png?refresh=20261113T145631Z)
+
+2026-11-13 已通过本机补采，恢复截至 2026-11-12（UTC）的 API 每日统计。本次更新在 GitHub Actions 受限期间完成。
 
 统计保留已记录的每日历史，并区分待补数据与零值；定义见 [访问统计](docs/traffic.md)。欢迎通过 GitHub Issue/PR 提交问题和改进。后续方向包括更多 PDK/版本支持与电路设计类型拓宽；v0.4.0 已包含指定 GUI 会话的原生操作。
 

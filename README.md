@@ -1,6 +1,6 @@
 # ads-mcp
 
-![Clones](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones.json) ![Views](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/views.json) ![Installs](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/installs.json)
+![Clones](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FLavaxzyh%2Fec682cff6f482626fa5348189838e66b%2Fraw%2Fclones.json%3Frefresh%3D20261113T145631Z) ![Views](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FLavaxzyh%2Fec682cff6f482626fa5348189838e66b%2Fraw%2Fviews.json%3Frefresh%3D20261113T145631Z) ![Installs](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FLavaxzyh%2Fec682cff6f482626fa5348189838e66b%2Fraw%2Finstalls.json%3Frefresh%3D20261113T145631Z)
 
 **ads-mcp v0.4.0** provides 49 MCP tools for Keysight ADS. The core workflow is **schematic → native Layout → Momentum → native emModel → circuit cosimulation**.
 
@@ -256,7 +256,9 @@ Public repository links, paper citations and license attribution remain intentio
 
 ## Repository traffic and contributing
 
-![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png)
+![clones history](https://gist.githubusercontent.com/Lavaxzyh/ec682cff6f482626fa5348189838e66b/raw/clones-history.png?refresh=20261113T145631Z)
+
+A local backfill on 2026-11-13 recovered API-reported daily data through 2026-11-12 (UTC) while GitHub Actions was blocked.
 
 Traffic collection retains recorded daily history and distinguishes pending observations from zeros; see [traffic definitions](docs/traffic.md). Report issues or propose improvements through GitHub. Future work includes broader PDK/version coverage and wider circuit-design coverage; v0.4.0 includes selected-session native operations.
 
